@@ -5,7 +5,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Float, OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
 
-type Category = "food" | "drug" | "device";
+type Category = "food" | "drug" | "device" | "consumer";
 type Severity = "LOW" | "MEDIUM" | "HIGH";
 
 type Recall = {
@@ -15,10 +15,17 @@ type Recall = {
   report_date?: string;
 };
 
-const endpoints: Record<Category, string> = {
+const endpoints: Record<Exclude<Category, "consumer">, string> = {
   food: "https://api.fda.gov/food/enforcement.json",
   drug: "https://api.fda.gov/drug/enforcement.json",
   device: "https://api.fda.gov/device/enforcement.json",
+};
+
+const categoryLabels: Record<Category, string> = {
+  food: "Food",
+  drug: "Medicine",
+  device: "Medical Devices",
+  consumer: "Consumer Products",
 };
 
 const linkCardStyle: CSSProperties = {
@@ -223,35 +230,41 @@ export default function App() {
   const [copied, setCopied] = useState("");
   const [expandedWhy, setExpandedWhy] = useState<string | null>(null);
 
-  const searchRecalls = async (overrideQuery?: string) => {
-    const searchTerm = overrideQuery || query;
-    if (!searchTerm.trim()) return;
+const searchRecalls = async (overrideQuery?: string) => {
+  const searchTerm = overrideQuery || query;
+  if (!searchTerm.trim()) return;
 
-    setLoading(true);
-    setError("");
-    setSearched(true);
+  setLoading(true);
+  setError("");
+  setSearched(true);
+  setResults([]);
 
-    try {
-      const encodedQuery = encodeURIComponent(searchTerm.trim());
-      const url = `${endpoints[category]}?search=${encodedQuery}&limit=10`;
-      const res = await fetch(url);
-      const data = await res.json();
+  if (category === "consumer") {
+    setLoading(false);
+    return;
+  }
 
-      if (!res.ok) {
-        setResults([]);
-        setError("");
-        return;
-      }
+  try {
+    const encodedQuery = encodeURIComponent(searchTerm.trim());
+    const url = `${endpoints[category]}?search=${encodedQuery}&limit=10`;
+    const res = await fetch(url);
+    const data = await res.json();
 
-      setResults(data.results || []);
-    } catch (err) {
-      console.error(err);
+    if (!res.ok) {
       setResults([]);
-      setError("Something went wrong while searching recalls.");
-    } finally {
-      setLoading(false);
+      setError("");
+      return;
     }
-  };
+
+    setResults(data.results || []);
+  } catch (err) {
+    console.error(err);
+    setResults([]);
+    setError("Something went wrong while searching recalls.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -458,7 +471,7 @@ ${url}`;
           }}
         >
           <div style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap" }}>
-            {(["food", "drug", "device"] as Category[]).map((c) => (
+            {(["food", "drug", "device", "consumer"] as Category[]).map((c) => (
               <button
                 key={c}
                 onClick={() => {
@@ -477,7 +490,7 @@ ${url}`;
                   fontWeight: 800,
                 }}
               >
-                {c.toUpperCase()}
+                {categoryLabels[c]}
               </button>
             ))}
           </div>
@@ -524,7 +537,7 @@ ${url}`;
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "14px", color: "#777" }}>
             <span>Try:</span>
-            {["milk", "chicken", "cheese", "Tylenol", "syringe"].map((item) => (
+            {["milk", "chicken", "Tylenol", "syringe", "toddler stool", "air fryer"].map((item) => (
               <button
                 key={item}
                 onClick={() => setQuery(item)}
