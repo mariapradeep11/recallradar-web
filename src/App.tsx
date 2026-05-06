@@ -217,6 +217,23 @@ function ThreeHero() {
   );
 }
 
+const getProductVisual = (category: Category, product = "") => {
+  const text = product.toLowerCase();
+
+  if (category === "food") {
+    if (text.includes("chicken")) return "🍗";
+    if (text.includes("milk")) return "🥛";
+    if (text.includes("cheese")) return "🧀";
+    return "🥫";
+  }
+
+  if (category === "drug") return "💊";
+  if (category === "device") return "🩺";
+  if (category === "consumer") return "📦";
+
+  return "🔍";
+};
+
 export default function App() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Recall[]>([]);
@@ -230,41 +247,41 @@ export default function App() {
   const [copied, setCopied] = useState("");
   const [expandedWhy, setExpandedWhy] = useState<string | null>(null);
 
-const searchRecalls = async (overrideQuery?: string) => {
-  const searchTerm = overrideQuery || query;
-  if (!searchTerm.trim()) return;
+  const searchRecalls = async (overrideQuery?: string) => {
+    const searchTerm = overrideQuery || query;
+    if (!searchTerm.trim()) return;
 
-  setLoading(true);
-  setError("");
-  setSearched(true);
-  setResults([]);
+    setLoading(true);
+    setError("");
+    setSearched(true);
+    setResults([]);
 
-  if (category === "consumer") {
-    setLoading(false);
-    return;
-  }
-
-  try {
-    const encodedQuery = encodeURIComponent(searchTerm.trim());
-    const url = `${endpoints[category]}?search=${encodedQuery}&limit=10`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (!res.ok) {
-      setResults([]);
-      setError("");
+    if (category === "consumer") {
+      setLoading(false);
       return;
     }
 
-    setResults(data.results || []);
-  } catch (err) {
-    console.error(err);
-    setResults([]);
-    setError("Something went wrong while searching recalls.");
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      const encodedQuery = encodeURIComponent(searchTerm.trim());
+      const url = `${endpoints[category]}?search=${encodedQuery}&limit=10`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setResults([]);
+        setError("");
+        return;
+      }
+
+      setResults(data.results || []);
+    } catch (err) {
+      console.error(err);
+      setResults([]);
+      setError("Something went wrong while searching recalls.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -583,11 +600,16 @@ ${url}`;
               BROADER SAFETY SIGNALS
             </p>
 
-            <h3 style={{ marginBottom: "10px" }}>No FDA match — expanding your search</h3>
+            <h3 style={{ marginBottom: "10px" }}>
+              {category === "consumer"
+                ? "Checking real-world safety signals"
+                : "No FDA match — expanding your search"}
+            </h3>
 
             <p style={{ color: "#aaa", lineHeight: 1.6 }}>
-              This product may still have safety risks. Check official consumer-product, news,
-              and manufacturer sources below.
+              {category === "consumer"
+                ? "Consumer product risks often appear in recalls, news reports, and manufacturer notices before centralized databases catch up."
+                : "This product may still have safety risks. Check official consumer-product, news, and manufacturer sources below."}
             </p>
 
             <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
@@ -629,6 +651,49 @@ ${url}`;
                 </div>
                 <span style={arrowStyle}>→</span>
               </a>
+            </div>
+
+            <div style={{ marginTop: "28px" }}>
+              <h4 style={{ marginBottom: "8px", color: "#fff" }}>
+                🧠 Recent safety signals
+              </h4>
+
+              <p style={{ color: "#888", fontSize: "14px", marginBottom: "14px" }}>
+                Early signals from news, public reports, and manufacturer activity.
+              </p>
+
+              <div
+                style={{
+                  background: "rgba(255,255,255,0.035)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  padding: "15px",
+                  borderRadius: "14px",
+                  marginBottom: "10px",
+                }}
+              >
+                <div style={{ color: "#ffb4ae", fontSize: "12px", marginBottom: "6px" }}>
+                  Recent • News signal
+                </div>
+                <div style={{ color: "#ddd", fontWeight: 700 }}>
+                  Search latest reports for “{query}” safety issues
+                </div>
+              </div>
+
+              <div
+                style={{
+                  background: "rgba(255,255,255,0.035)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  padding: "15px",
+                  borderRadius: "14px",
+                }}
+              >
+                <div style={{ color: "#ffcc66", fontSize: "12px", marginBottom: "6px" }}>
+                  Manufacturer • Recall notice
+                </div>
+                <div style={{ color: "#ddd", fontWeight: 700 }}>
+                  Check whether the brand has issued return or refund guidance
+                </div>
+              </div>
             </div>
           </section>
         )}
