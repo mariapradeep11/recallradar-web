@@ -3,14 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Float, OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-/**
- * @typedef {'food'|'drug'|'device'|'consumer'} Category
- * @typedef {'LOW'|'MEDIUM'|'HIGH'} Severity
- * @typedef {{ product_description?: string; reason_for_recall?: string; recalling_firm?: string; report_date?: string; }} Recall
- */
+import BarcodeScanner from "./BarcodeScanner.jsx";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -156,19 +149,20 @@ const arrowStyle = { color: "#ff3b30" };
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [query, setQuery]               = useState("");
-  const [results, setResults]           = useState([]);
-  const [loading, setLoading]           = useState(false);
-  const [category, setCategory]         = useState("food");
-  const [searched, setSearched]         = useState(false);
-  const [error, setError]               = useState("");
+  const [query, setQuery]                     = useState("");
+  const [results, setResults]                 = useState([]);
+  const [loading, setLoading]                 = useState(false);
+  const [category, setCategory]               = useState("food");
+  const [searched, setSearched]               = useState(false);
+  const [error, setError]                     = useState("");
   const [selectedProduct, setSelectedProduct] = useState("");
-  const [email, setEmail]               = useState("");
-  const [joined, setJoined]             = useState(false);
-  const [copied, setCopied]             = useState("");
-  const [expandedWhy, setExpandedWhy]   = useState(null);
+  const [email, setEmail]                     = useState("");
+  const [joined, setJoined]                   = useState(false);
+  const [copied, setCopied]                   = useState("");
+  const [expandedWhy, setExpandedWhy]         = useState(null);
+  const [showScanner, setShowScanner]         = useState(false);
+  const [scannedLabel, setScannedLabel]       = useState("");
 
-  // FIX: useCallback so the function reference is stable for useEffect dependency
   const searchRecalls = useCallback(async (overrideQuery, overrideCategory) => {
     const searchTerm = overrideQuery ?? query;
     const cat        = overrideCategory ?? category;
@@ -187,49 +181,43 @@ export default function App() {
     try {
       const url = `${endpoints[cat]}?search=${encodeURIComponent(searchTerm.trim())}&limit=10`;
       const res = await fetch(url);
-
-      // FIX: handle non-ok responses gracefully
       if (!res.ok) {
-        if (res.status === 404) {
-          setResults([]);   // no results — not an error
-        } else {
-          setError(`Search failed (${res.status}). Please try again.`);
-        }
+        if (res.status === 404) { setResults([]); }
+        else { setError(`Search failed (${res.status}). Please try again.`); }
         return;
       }
-
       const data = await res.json();
       setResults(data.results ?? []);
     } catch (err) {
-      // FIX: distinguish network errors from logic errors
-      if (err.name === "TypeError") {
-        setError("Network error — check your connection and try again.");
-      } else {
-        setError("Something went wrong. Please try again.");
-      }
-      console.error("Search error:", err);
+      setError(err.name === "TypeError"
+        ? "Network error — check your connection and try again."
+        : "Something went wrong. Please try again."
+      );
     } finally {
       setLoading(false);
     }
   }, [query, category]);
 
-  // FIX: read shared URL params on mount — no stale closure
   useEffect(() => {
-    const params     = new URLSearchParams(window.location.search);
+    const params      = new URLSearchParams(window.location.search);
     const sharedQuery = params.get("q");
-    const sharedCat  = params.get("cat");
-
+    const sharedCat   = params.get("cat");
     if (sharedQuery) {
-      const cat = (sharedCat && ["food","drug","device","consumer"].includes(sharedCat))
-        ? sharedCat
-        : "food";
+      const cat = (sharedCat && ["food","drug","device","consumer"].includes(sharedCat)) ? sharedCat : "food";
       setQuery(sharedQuery);
       setCategory(cat);
-      // Pass values directly — avoids stale state on first render
       searchRecalls(sharedQuery, cat);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally run once on mount only
+  }, []);
+
+  // Called by BarcodeScanner when a barcode is resolved to a product name
+  const handleScanResult = (productName) => {
+    setScannedLabel(productName);
+    setQuery(productName);
+    setCategory("food"); // barcodes are almost always food products
+    searchRecalls(productName, "food");
+  };
 
   const buildShareUrl = (recall) => {
     const params = new URLSearchParams({ q: query || recall.product_description || "", cat: category });
@@ -240,68 +228,33 @@ export default function App() {
     const url  = buildShareUrl(recall);
     const text = `⚠️ Recall Alert\n\nProduct: ${shortText(recall.product_description, 180)}\n\nReason: ${shortText(recall.reason_for_recall, 180)}\n\nCheck it on RecallRadar:\n${url}`;
     try {
-      if (navigator.share) {
-        await navigator.share({ title: "Recall Alert", text, url });
-      } else {
+      if (navigator.share) { await navigator.share({ title: "Recall Alert", text, url }); }
+      else {
         await navigator.clipboard.writeText(text);
         setCopied(recall.product_description || "recall");
         setTimeout(() => setCopied(""), 1800);
       }
-    } catch (err) {
-      console.error("Share failed:", err);
-    }
+    } catch (err) { console.error("Share failed:", err); }
   };
 
-  const openPremiumModal = (product) => {
-    setSelectedProduct(product || query || "this product");
-    setJoined(false);
-  };
-
-  const closePremiumModal = () => {
-    setSelectedProduct("");
-    setEmail("");
-    setJoined(false);
-  };
+  const openPremiumModal  = (product) => { setSelectedProduct(product || query || "this product"); setJoined(false); };
+  const closePremiumModal = () => { setSelectedProduct(""); setEmail(""); setJoined(false); };
+  const handleCategoryChange = (c) => { setCategory(c); setResults([]); setSearched(false); setError(""); };
 
   const joinWaitlist = async () => {
-    if (!email.trim() || !isValidEmail(email)) {
-      alert("Please enter a valid email address.");
-      return;
-    }
+    if (!email.trim() || !isValidEmail(email)) { alert("Please enter a valid email address."); return; }
     try {
       const res = await fetch(
         "https://api.sheetbest.com/sheets/a5c4ecd4-7684-48f7-9cd0-8ccf090c0b7a",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email:        email.trim(),
-            product:      selectedProduct,
-            category,
-            search_query: query,
-            source:       "premium_modal",
-            timestamp:    new Date().toISOString(),
-          }),
+          body: JSON.stringify({ email: email.trim(), product: selectedProduct, category, search_query: query, source: "premium_modal", timestamp: new Date().toISOString() }),
         }
       );
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Sheet.best error:", res.status, errorText);
-        alert(`Could not save email (${res.status}). Please try again.`);
-        return;
-      }
+      if (!res.ok) { alert(`Could not save email (${res.status}). Please try again.`); return; }
       setJoined(true);
-    } catch (err) {
-      console.error("Waitlist error:", err);
-      alert("Network error — please try again.");
-    }
-  };
-
-  const handleCategoryChange = (c) => {
-    setCategory(c);
-    setResults([]);
-    setSearched(false);
-    setError("");
+    } catch { alert("Network error — please try again."); }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -317,7 +270,6 @@ export default function App() {
       overflow: "hidden",
     }}>
       <ThreeHero />
-
       <div style={{
         position: "absolute", inset: 0,
         background: "linear-gradient(to bottom, rgba(5,5,5,0.08), rgba(5,5,5,0.78) 58%, #050505 100%)",
@@ -386,16 +338,38 @@ export default function App() {
             ))}
           </div>
 
+          {/* Search row with barcode button */}
           <div style={{ display: "flex", gap: "10px", marginTop: "24px" }}>
+            {/* Barcode scan button */}
+            <button
+              onClick={() => setShowScanner(true)}
+              title="Scan a barcode"
+              style={{
+                padding: "17px 18px",
+                borderRadius: "16px",
+                background: "rgba(255,59,48,0.12)",
+                border: "1px solid rgba(255,59,48,0.3)",
+                color: "#ff3b30",
+                cursor: "pointer",
+                fontSize: "1.3rem",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              📷
+            </button>
+
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); setScannedLabel(""); }}
               onKeyDown={(e) => e.key === "Enter" && searchRecalls()}
-              placeholder="Search product, brand, ingredient..."
+              placeholder="Search product, brand, ingredient…"
               style={{
                 flex: 1, padding: "17px", borderRadius: "16px",
-                border: "1px solid rgba(255,255,255,0.12)", background: "#080808",
-                color: "#fff", outline: "none", fontSize: "1rem",
+                border: scannedLabel ? "1px solid rgba(255,59,48,0.5)" : "1px solid rgba(255,255,255,0.12)",
+                background: "#080808", color: "#fff", outline: "none", fontSize: "1rem",
               }}
             />
             <button
@@ -404,12 +378,29 @@ export default function App() {
               style={{
                 padding: "17px 26px", borderRadius: "16px", background: "#fff",
                 color: "#000", border: "none", cursor: loading ? "not-allowed" : "pointer",
-                fontWeight: 900, opacity: loading ? 0.7 : 1,
+                fontWeight: 900, opacity: loading ? 0.7 : 1, flexShrink: 0,
               }}
             >
               {loading ? "Searching…" : "Search"}
             </button>
           </div>
+
+          {/* Scanned label badge */}
+          {scannedLabel && (
+            <div style={{
+              marginTop: "10px", display: "inline-flex", alignItems: "center", gap: "8px",
+              background: "rgba(255,59,48,0.12)", border: "1px solid rgba(255,59,48,0.25)",
+              borderRadius: "999px", padding: "6px 12px", fontSize: "0.82rem", color: "#ffb4ae",
+            }}>
+              📷 Scanned: <strong>{shortText(scannedLabel, 60)}</strong>
+              <button
+                onClick={() => setScannedLabel("")}
+                style={{ background: "none", border: "none", color: "#ff8a80", cursor: "pointer", padding: 0, fontSize: "0.85rem" }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           <p style={{ color: "#777", fontSize: "0.85rem", marginTop: "12px" }}>
             🔒 Join early access to monitor products and get future safety alerts.
@@ -433,14 +424,8 @@ export default function App() {
         </section>
 
         {/* ── Feedback ── */}
-        {error && (
-          <p style={{ color: "#ff8a80", marginTop: "20px", textAlign: "center" }}>{error}</p>
-        )}
-        {copied && (
-          <p style={{ color: "#a7f3d0", marginTop: "20px", textAlign: "center", fontWeight: 800 }}>
-            Link copied to clipboard.
-          </p>
-        )}
+        {error && <p style={{ color: "#ff8a80", marginTop: "20px", textAlign: "center" }}>{error}</p>}
+        {copied && <p style={{ color: "#a7f3d0", marginTop: "20px", textAlign: "center", fontWeight: 800 }}>Link copied to clipboard.</p>}
 
         {/* ── No Results ── */}
         {!loading && searched && results.length === 0 && (
@@ -449,9 +434,7 @@ export default function App() {
             background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)",
             backdropFilter: "blur(10px)",
           }}>
-            <p style={{ color: "#ffb4ae", fontSize: "12px", marginBottom: "10px", fontWeight: 900 }}>
-              BROADER SAFETY SIGNALS
-            </p>
+            <p style={{ color: "#ffb4ae", fontSize: "12px", marginBottom: "10px", fontWeight: 900 }}>BROADER SAFETY SIGNALS</p>
             <h3 style={{ marginBottom: "10px" }}>
               {category === "consumer" ? "Checking real-world safety signals" : "No FDA match — expanding your search"}
             </h3>
@@ -504,7 +487,6 @@ export default function App() {
                   background: "radial-gradient(circle at top right, rgba(255,59,48,0.16), transparent 32%)",
                   pointerEvents: "none",
                 }} />
-
                 <div style={{ position: "relative" }}>
                   <div style={{
                     display: "inline-flex",
@@ -514,11 +496,9 @@ export default function App() {
                   }}>
                     ⚠️ {severity} RISK
                   </div>
-
                   <h3 style={{ fontSize: "1.35rem", lineHeight: 1.35, margin: "0 0 12px" }}>
                     {highlight(shortText(r.product_description || "Unknown product", 180), query)}
                   </h3>
-
                   <p style={{ color: "#bbb", lineHeight: 1.55 }}>
                     <strong style={{ color: "#fff" }}>Reason:</strong>{" "}
                     {highlight(shortText(r.reason_for_recall || "No data", 180), query)}
@@ -547,7 +527,6 @@ export default function App() {
                         </motion.div>
                       ))}
                     </div>
-
                     <button
                       onClick={() => setExpandedWhy(isExpanded ? null : cardId)}
                       style={{
@@ -558,7 +537,6 @@ export default function App() {
                     >
                       {isExpanded ? "Hide explanation" : "Why is this dangerous?"}
                     </button>
-
                     <AnimatePresence>
                       {isExpanded && (
                         <motion.div
@@ -576,8 +554,7 @@ export default function App() {
                           </p>
                           <a
                             href={`https://www.google.com/search?q=${encodeURIComponent(`${r.recalling_firm || ""} recall contact return refund`)}`}
-                            target="_blank" rel="noreferrer"
-                            style={{ color: "#ffb4ae", fontWeight: 800 }}
+                            target="_blank" rel="noreferrer" style={{ color: "#ffb4ae", fontWeight: 800 }}
                           >
                             Find return/contact info →
                           </a>
@@ -592,7 +569,6 @@ export default function App() {
                   <p style={{ color: "#666", marginTop: 0 }}>
                     <strong>Date:</strong> {formatDate(r.report_date)}
                   </p>
-
                   <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
                     <button
                       onClick={() => openPremiumModal(r.product_description)}
@@ -622,6 +598,16 @@ export default function App() {
         </footer>
       </motion.div>
 
+      {/* ── Barcode Scanner Modal ── */}
+      <AnimatePresence>
+        {showScanner && (
+          <BarcodeScanner
+            onResult={handleScanResult}
+            onClose={() => setShowScanner(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* ── Premium Modal ── */}
       <AnimatePresence>
         {selectedProduct && (
@@ -648,9 +634,7 @@ export default function App() {
             >
               {!joined ? (
                 <>
-                  <p style={{ color: "#ff8a80", fontWeight: 900, letterSpacing: "0.08em", fontSize: "0.78rem", margin: 0 }}>
-                    PREMIUM MONITORING
-                  </p>
+                  <p style={{ color: "#ff8a80", fontWeight: 900, letterSpacing: "0.08em", fontSize: "0.78rem", margin: 0 }}>PREMIUM MONITORING</p>
                   <h2 style={{ margin: "12px 0", fontSize: "2rem" }}>Never miss a dangerous recall.</h2>
                   <p style={{ color: "#aaa", lineHeight: 1.6 }}>
                     Join early access and we'll notify you when monitoring opens for products like:
@@ -673,39 +657,18 @@ export default function App() {
                       color: "#fff", outline: "none", fontSize: "1rem",
                     }}
                   />
-                  <button
-                    onClick={joinWaitlist}
-                    style={{
-                      width: "100%", marginTop: "12px", padding: "15px", borderRadius: "14px",
-                      background: "#ff3b30", color: "#fff", border: "none", fontWeight: 900,
-                      cursor: "pointer", fontSize: "1rem",
-                    }}
-                  >
+                  <button onClick={joinWaitlist} style={{ width: "100%", marginTop: "12px", padding: "15px", borderRadius: "14px", background: "#ff3b30", color: "#fff", border: "none", fontWeight: 900, cursor: "pointer", fontSize: "1rem" }}>
                     Join early access
                   </button>
-                  <button
-                    onClick={closePremiumModal}
-                    style={{
-                      width: "100%", marginTop: "10px", padding: "12px", borderRadius: "14px",
-                      background: "transparent", color: "#888", border: "none", cursor: "pointer",
-                    }}
-                  >
+                  <button onClick={closePremiumModal} style={{ width: "100%", marginTop: "10px", padding: "12px", borderRadius: "14px", background: "transparent", color: "#888", border: "none", cursor: "pointer" }}>
                     Maybe later
                   </button>
                 </>
               ) : (
                 <>
                   <h2 style={{ margin: "0 0 12px", fontSize: "2rem" }}>You're on the list.</h2>
-                  <p style={{ color: "#aaa", lineHeight: 1.6 }}>
-                    Your email has been saved. We'll notify you when premium monitoring opens.
-                  </p>
-                  <button
-                    onClick={closePremiumModal}
-                    style={{
-                      width: "100%", marginTop: "12px", padding: "15px", borderRadius: "14px",
-                      background: "#fff", color: "#000", border: "none", fontWeight: 900, cursor: "pointer",
-                    }}
-                  >
+                  <p style={{ color: "#aaa", lineHeight: 1.6 }}>Your email has been saved. We'll notify you when premium monitoring opens.</p>
+                  <button onClick={closePremiumModal} style={{ width: "100%", marginTop: "12px", padding: "15px", borderRadius: "14px", background: "#fff", color: "#000", border: "none", fontWeight: 900, cursor: "pointer" }}>
                     Continue exploring
                   </button>
                 </>
