@@ -1,73 +1,58 @@
-# React + TypeScript + Vite
+# RecallRadar
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Consumer safety intelligence — search food, drug, and medical device recalls.
 
-Currently, two official plugins are available:
+## Deploy to Vercel (free, ~3 minutes)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Step 1 — Push to GitHub
+```bash
+cd recallradar
+git init
+git add .
+git commit -m "Initial commit"
+```
+Then create a new repo at https://github.com/new and push:
+```bash
+git remote add origin https://github.com/YOUR_USERNAME/recallradar.git
+git branch -M main
+git push -u origin main
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Step 2 — Deploy on Vercel
+1. Go to https://vercel.com and sign up (free) with your GitHub account
+2. Click **Add New → Project**
+3. Import your `recallradar` GitHub repo
+4. Leave all settings as default — Vercel auto-detects Vite
+5. Click **Deploy**
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+That's it. Your app will be live at `recallradar.vercel.app` in ~60 seconds.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Step 3 — Every future update
+```bash
+git add .
+git commit -m "Your change"
+git push
 ```
+Vercel auto-deploys on every push. No manual steps.
+
+## Local development
+```bash
+npm install
+npm run dev
+```
+
+## Tech stack
+- React 18 + Vite
+- Framer Motion (animations)
+- React Three Fiber + Drei (3D hero)
+- openFDA public API (no key needed)
+- SheetBest (waitlist email capture)
+- Vercel (hosting, free tier)
+
+## Bugs fixed in this version
+- Stale closure bug in useEffect (searchRecalls now uses useCallback)
+- Non-ok API responses handled gracefully (404 = no results, not an error)
+- Network errors distinguished from logic errors
+- Share URL now includes category param
+- Search button disabled while loading
+- Enter key works in email input on modal
