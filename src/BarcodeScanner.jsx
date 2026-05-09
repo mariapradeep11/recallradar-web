@@ -117,7 +117,12 @@ export default function BarcodeScanner({ onResult, onClose }) {
         stopStream();
 
         const barcode = result.getText();
-        console.log("BARCODE FOUND:", barcode);
+        console.log({
+  text: result.getText(),
+  format: result.getBarcodeFormat(),
+});
+
+console.log("BARCODE FOUND:", barcode);
 
         setPhase("found");
         setFoundText("Looking up product…");
