@@ -42,12 +42,16 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: front ? "user" : { ideal: "environment" } },
+        video: {
+          facingMode: front ? "user" : { ideal: "environment" },
+          // Explicit size helps iOS render the video correctly
+          width:  { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false,
       });
       streamRef.current = stream;
 
-      // Check how many cameras exist
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         setHasFront(devices.filter((d) => d.kind === "videoinput").length > 1);
@@ -55,38 +59,36 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
       const video = videoRef.current;
       if (video) {
+        // ── iOS Safari critical fixes ──────────────────────────────────────
+        // 1. srcObject must be set before play()
+        // 2. muted must be true (iOS blocks autoplay with audio)
+        // 3. playsInline prevents fullscreen takeover on iOS
+        // 4. Explicit width/height prevents black frame
         video.srcObject = stream;
-        video.setAttribute("playsinline", "true"); // critical for iOS
         video.muted = true;
-        await video.play();
+        video.playsInline = true;
+
+        // Wait for metadata so iOS knows the video dimensions
+        await new Promise((resolve) => {
+          video.onloadedmetadata = () => {
+            video.width  = video.videoWidth  || 640;
+            video.height = video.videoHeight || 480;
+            resolve();
+          };
+          // Fallback if metadata already loaded
+          if (video.readyState >= 1) resolve();
+        });
+
+        try {
+          await video.play();
+        } catch (playErr) {
+          // Some iOS versions need a user-gesture retry
+          console.warn("video.play() failed:", playErr);
+        }
       }
 
       setPhase("scanning");
-
-      // Scan loop — grab canvas frame every 400ms and decode
-      scanLoopRef.current = setInterval(async () => {
-        const v = videoRef.current;
-        const c = canvasRef.current;
-        if (!v || !c || v.readyState < 2 || v.videoWidth === 0) return;
-
-        c.width  = v.videoWidth;
-        c.height = v.videoHeight;
-        c.getContext("2d").drawImage(v, 0, 0);
-
-        try {
-          const result = await readerRef.current.decodeFromCanvas(c);
-          if (result) {
-            stopStream();
-            const barcode = result.getText();
-            setPhase("found");
-            setFoundText("Looking up product…");
-            const name  = await lookupBarcode(barcode);
-            const label = name || `Barcode: ${barcode}`;
-            setFoundText(label);
-            setTimeout(() => { onResult(name || barcode); onClose(); }, 900);
-          }
-        } catch { /* no barcode yet — keep looping */ }
-      }, 400);
+      beginScanLoop();
 
     } catch (err) {
       console.error("Camera error:", err.name, err.message);
@@ -95,6 +97,32 @@ export default function BarcodeScanner({ onResult, onClose }) {
       else if (err.name === "NotReadableError" || err.name === "TrackStartError")  setPhase("inuse");
       else setPhase("unavailable");
     }
+  };
+
+  const beginScanLoop = () => {
+    scanLoopRef.current = setInterval(async () => {
+      const v = videoRef.current;
+      const c = canvasRef.current;
+      if (!v || !c || v.readyState < 2 || v.videoWidth === 0) return;
+
+      c.width  = v.videoWidth;
+      c.height = v.videoHeight;
+      c.getContext("2d").drawImage(v, 0, 0);
+
+      try {
+        const result = await readerRef.current.decodeFromCanvas(c);
+        if (result) {
+          stopStream();
+          const barcode = result.getText();
+          setPhase("found");
+          setFoundText("Looking up product…");
+          const name  = await lookupBarcode(barcode);
+          const label = name || `Barcode: ${barcode}`;
+          setFoundText(label);
+          setTimeout(() => { onResult(name || barcode); onClose(); }, 900);
+        }
+      } catch { /* no barcode in frame yet */ }
+    }, 400);
   };
 
   const stopCamera   = () => { stopStream(); setPhase("stopped"); };
@@ -148,9 +176,7 @@ export default function BarcodeScanner({ onResult, onClose }) {
           <div style={{ padding: "32px 24px", textAlign: "center" }}>
             <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🚫</div>
             <h3 style={{ margin: "0 0 10px", color: "#ff8a80" }}>Camera access blocked</h3>
-            <p style={{ color: "#888", lineHeight: 1.6, fontSize: "0.9rem", marginBottom: "20px" }}>
-              Enable camera access for this site:
-            </p>
+            <p style={{ color: "#888", lineHeight: 1.6, fontSize: "0.9rem", marginBottom: "20px" }}>Enable camera access for this site:</p>
             <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
               {[
                 { icon: "🍎", label: "iPhone · Safari",  step: "Settings app → Safari → Camera → Allow" },
@@ -175,7 +201,7 @@ export default function BarcodeScanner({ onResult, onClose }) {
             <div style={{ fontSize: "3rem", marginBottom: "16px" }}>📹</div>
             <h3 style={{ margin: "0 0 10px", color: "#ff9500" }}>Camera is in use</h3>
             <p style={{ color: "#888", lineHeight: 1.6, fontSize: "0.9rem", marginBottom: "24px" }}>
-              Another app is using your camera. Close it (e.g. FaceTime, Snapchat) and try again.
+              Another app is using your camera. Close it and try again.
             </p>
             <button onClick={() => startCamera(false)} style={whiteBtn}>Try again</button>
             <button onClick={onClose} style={ghostBtn}>Search manually instead</button>
@@ -203,33 +229,74 @@ export default function BarcodeScanner({ onResult, onClose }) {
         {/* SCANNING / FOUND / STOPPED */}
         {(phase === "scanning" || phase === "found" || phase === "stopped") && (
           <>
-            <div style={{ position: "relative", background: "#000", aspectRatio: "1" }}>
+            <div style={{ position: "relative", background: "#111", width: "100%", aspectRatio: "1", overflow: "hidden" }}>
+              {/* 
+                iOS Safari critical: 
+                - playsInline as JSX prop AND html attribute
+                - explicit width/height 100% 
+                - autoPlay as JSX prop
+                - object-fit cover
+              */}
               <video
                 ref={videoRef}
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: phase === "stopped" ? 0.25 : 1, transition: "opacity 0.3s" }}
-                muted playsInline autoPlay
+                playsInline
+                muted
+                autoPlay
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  opacity: phase === "stopped" ? 0.25 : 1,
+                  transition: "opacity 0.3s",
+                  // Force GPU layer — helps iOS render video in modal context
+                  transform: "translateZ(0)",
+                  WebkitTransform: "translateZ(0)",
+                }}
               />
               <canvas ref={canvasRef} style={{ display: "none" }} />
 
+              {/* Scan frame overlay */}
               {phase === "scanning" && (
                 <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+                  {/* Dark vignette outside scan area */}
+                  <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)" }} />
+                  {/* Clear centre box */}
+                  <div style={{
+                    position: "absolute",
+                    top: "20%", left: "15%", right: "15%", bottom: "20%",
+                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
+                    borderRadius: "8px",
+                  }} />
+                  {/* Corner brackets */}
                   {[
-                    { top: "22%", left: "22%", borderTop: "3px solid #ff3b30", borderLeft: "3px solid #ff3b30" },
-                    { top: "22%", right: "22%", borderTop: "3px solid #ff3b30", borderRight: "3px solid #ff3b30" },
-                    { bottom: "22%", left: "22%", borderBottom: "3px solid #ff3b30", borderLeft: "3px solid #ff3b30" },
-                    { bottom: "22%", right: "22%", borderBottom: "3px solid #ff3b30", borderRight: "3px solid #ff3b30" },
-                  ].map((s, i) => <div key={i} style={{ position: "absolute", width: "28px", height: "28px", borderRadius: "2px", ...s }} />)}
-                  <div style={{ position: "absolute", left: "22%", right: "22%", height: "2px", background: "linear-gradient(90deg, transparent, #ff3b30, transparent)", animation: "scanline 2s ease-in-out infinite" }} />
+                    { top: "20%", left: "15%", borderTop: "3px solid #ff3b30", borderLeft: "3px solid #ff3b30", borderRadius: "4px 0 0 0" },
+                    { top: "20%", right: "15%", borderTop: "3px solid #ff3b30", borderRight: "3px solid #ff3b30", borderRadius: "0 4px 0 0" },
+                    { bottom: "20%", left: "15%", borderBottom: "3px solid #ff3b30", borderLeft: "3px solid #ff3b30", borderRadius: "0 0 0 4px" },
+                    { bottom: "20%", right: "15%", borderBottom: "3px solid #ff3b30", borderRight: "3px solid #ff3b30", borderRadius: "0 0 4px 0" },
+                  ].map((s, i) => (
+                    <div key={i} style={{ position: "absolute", width: "32px", height: "32px", ...s }} />
+                  ))}
+                  {/* Scan line */}
+                  <div style={{
+                    position: "absolute",
+                    left: "15%", right: "15%", height: "2px",
+                    background: "linear-gradient(90deg, transparent, #ff3b30, transparent)",
+                    animation: "scanline 2s ease-in-out infinite",
+                  }} />
                 </div>
               )}
 
+              {/* Found overlay */}
               {phase === "found" && (
                 <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.78)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px" }}>
                   <div style={{ fontSize: "3rem" }}>✅</div>
-                  <p style={{ color: "#fff", fontWeight: 800, textAlign: "center", padding: "0 24px" }}>{foundText}</p>
+                  <p style={{ color: "#fff", fontWeight: 800, textAlign: "center", padding: "0 24px", margin: 0 }}>{foundText}</p>
                 </div>
               )}
 
+              {/* Stopped overlay */}
               {phase === "stopped" && (
                 <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px" }}>
                   <p style={{ color: "#aaa", fontWeight: 700, margin: 0 }}>Camera paused</p>
@@ -238,9 +305,10 @@ export default function BarcodeScanner({ onResult, onClose }) {
               )}
             </div>
 
+            {/* Controls */}
             <div style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
               <p style={{ color: "#555", fontSize: "0.78rem", margin: 0, flex: 1 }}>
-                {phase === "scanning" ? "Point at any product barcode" : ""}
+                {phase === "scanning" ? "Point barcode at the red frame" : ""}
               </p>
               <div style={{ display: "flex", gap: "8px" }}>
                 {phase === "scanning" && <button onClick={stopCamera} style={chipBtn}>⏸ Pause</button>}
@@ -253,9 +321,9 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
       <style>{`
         @keyframes scanline {
-          0%   { top: 22%; }
-          50%  { top: 76%; }
-          100% { top: 22%; }
+          0%   { top: 20%; }
+          50%  { top: 78%; }
+          100% { top: 20%; }
         }
       `}</style>
     </div>
