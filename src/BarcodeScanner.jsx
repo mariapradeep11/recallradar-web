@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { DecodeHintType } from "@zxing/library";
 
 async function lookupBarcode(barcode) {
   try {
@@ -18,15 +19,14 @@ async function lookupBarcode(barcode) {
 export default function BarcodeScanner({ onResult, onClose }) {
   const videoRef    = useRef(null);
   const canvasRef   = useRef(null);
-  const streamRef   = useRef(null);
-  const hints = new Map();
-
-  hints.set(DecodeHintType.TRY_HARDER, true);
-
-
-  const readerRef = useRef(new BrowserMultiFormatReader(hints));
+  const controlsRef = useRef(null);
   const scanLoopRef = useRef(null);
   const isProcessingRef = useRef(false);
+
+  const hints = new Map();
+  hints.set(DecodeHintType.TRY_HARDER, true);
+
+  const readerRef = useRef(new BrowserMultiFormatReader(hints));
 
   const [phase, setPhase]             = useState("idle");
   const [foundText, setFoundText]     = useState("");
@@ -38,9 +38,9 @@ export default function BarcodeScanner({ onResult, onClose }) {
     clearInterval(scanLoopRef.current);
     scanLoopRef.current = null;
     isProcessingRef.current = false;
+    controlsRef.current?.stop?.();
+    controlsRef.current = null;
     readerRef.current?.reset?.();
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
   };
 
   const startCamera = async (front = false) => {
@@ -49,50 +49,65 @@ export default function BarcodeScanner({ onResult, onClose }) {
     setErrorDetail("");
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      setPhase("scanning");
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const video = videoRef.current;
+      if (!video) return;
+
+      video.muted = true;
+      video.playsInline = true;
+      video.setAttribute("playsinline", "true");
+      video.setAttribute("webkit-playsinline", "true");
+
+      try {
+        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+        setHasFront(devices.length > 1);
+      } catch { /* ignore */ }
+
+      const constraints = {
         video: {
           facingMode: front ? "user" : { ideal: "environment" },
           width:  { ideal: 1280 },
           height: { ideal: 720 },
         },
         audio: false,
-      });
-      streamRef.current = stream;
+      };
 
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        setHasFront(devices.filter((d) => d.kind === "videoinput").length > 1);
-      } catch { /* ignore */ }
+      controlsRef.current = await readerRef.current.decodeFromConstraints(
+        constraints,
+        video,
+        async (result) => {
+          if (!result || isProcessingRef.current) return;
 
-      setPhase("scanning");
+          isProcessingRef.current = true;
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+          const barcode = result.getText();
 
-      const video = videoRef.current;
-      if (video) {
-        video.muted = true;
-        video.playsInline = true;
-        video.setAttribute("playsinline", "true");
-        video.setAttribute("webkit-playsinline", "true");
-        video.srcObject = stream;
+          console.log({
+            text: result.getText(),
+            format: result.getBarcodeFormat?.(),
+          });
 
-        await new Promise((resolve) => {
-          video.onloadedmetadata = () => {
-            video.width  = video.videoWidth  || 640;
-            video.height = video.videoHeight || 480;
-            resolve();
-          };
-          if (video.readyState >= 1) resolve();
-        });
+          console.log("BARCODE FOUND:", barcode);
 
-        try {
-          await video.play();
-        } catch (playErr) {
-          console.warn("video.play() failed:", playErr);
+          stopStream();
+
+          setPhase("found");
+          setFoundText("Looking up product…");
+
+          const name = await lookupBarcode(barcode);
+          const label = name || `Barcode: ${barcode}`;
+
+          setFoundText(label);
+
+          setTimeout(() => {
+            onResult(name || barcode);
+            onClose();
+          }, 900);
         }
-      }
-
-      beginScanLoop();
+      );
 
     } catch (err) {
       console.error("Camera error:", err.name, err.message);
@@ -102,88 +117,6 @@ export default function BarcodeScanner({ onResult, onClose }) {
       else setPhase("unavailable");
     }
   };
-
-const beginScanLoop = () => {
-  const video = videoRef.current;
-  const canvas = canvasRef.current;
-
-  if (!video || !canvas) return;
-
-  const ctx = canvas.getContext("2d");
-
-  scanLoopRef.current = setInterval(async () => {
-    if (isProcessingRef.current) return;
-    if (video.readyState < 2 || video.videoWidth === 0) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    try {
-      let barcodeValue = null;
-
-      // Native browser barcode detector first
-      if ("BarcodeDetector" in window) {
-        const detector = new window.BarcodeDetector({
-          formats: [
-            "ean_13",
-            "ean_8",
-            "upc_a",
-            "upc_e",
-            "code_128",
-            "itf",
-          ],
-        });
-
-        const barcodes = await detector.detect(canvas);
-
-        if (barcodes.length > 0) {
-          barcodeValue = barcodes[0].rawValue;
-
-          console.log("NATIVE BARCODE FOUND:", barcodes[0]);
-        }
-      }
-
-      // ZXing fallback
-      if (!barcodeValue) {
-        const result = await readerRef.current.decodeFromCanvas(canvas);
-
-        barcodeValue = result.getText();
-
-        console.log({
-          text: result.getText(),
-          format: result.getBarcodeFormat(),
-        });
-
-        console.log("ZXING BARCODE FOUND:", barcodeValue);
-      }
-
-      if (!barcodeValue) return;
-
-      isProcessingRef.current = true;
-
-      stopStream();
-
-      setPhase("found");
-      setFoundText("Looking up product…");
-
-      const name = await lookupBarcode(barcodeValue);
-
-      const label = name || `Barcode: ${barcodeValue}`;
-
-      setFoundText(label);
-
-      setTimeout(() => {
-        onResult(name || barcodeValue);
-        onClose();
-      }, 900);
-
-    } catch {
-      // no barcode detected yet
-    }
-  }, 300);
-};
 
   const stopCamera   = () => { stopStream(); setPhase("stopped"); };
   const resumeCamera = () => startCamera(useFront);
