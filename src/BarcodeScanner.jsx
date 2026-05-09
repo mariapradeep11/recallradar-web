@@ -103,42 +103,87 @@ export default function BarcodeScanner({ onResult, onClose }) {
     }
   };
 
-  const beginScanLoop = () => {
-    const video = videoRef.current;
-    if (!video) return;
+const beginScanLoop = () => {
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
 
-    readerRef.current.decodeFromVideoElementContinuously(
-      video,
-      async (result) => {
-        if (!result || isProcessingRef.current) return;
+  if (!video || !canvas) return;
 
-        isProcessingRef.current = true;
+  const ctx = canvas.getContext("2d");
 
-        stopStream();
+  scanLoopRef.current = setInterval(async () => {
+    if (isProcessingRef.current) return;
+    if (video.readyState < 2 || video.videoWidth === 0) return;
 
-        const barcode = result.getText();
-        console.log({
-  text: result.getText(),
-  format: result.getBarcodeFormat(),
-});
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-console.log("BARCODE FOUND:", barcode);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        setPhase("found");
-        setFoundText("Looking up product…");
+    try {
+      let barcodeValue = null;
 
-        const name = await lookupBarcode(barcode);
-        const label = name || `Barcode: ${barcode}`;
+      // Native browser barcode detector first
+      if ("BarcodeDetector" in window) {
+        const detector = new window.BarcodeDetector({
+          formats: [
+            "ean_13",
+            "ean_8",
+            "upc_a",
+            "upc_e",
+            "code_128",
+            "itf",
+          ],
+        });
 
-        setFoundText(label);
+        const barcodes = await detector.detect(canvas);
 
-        setTimeout(() => {
-          onResult(name || barcode);
-          onClose();
-        }, 900);
+        if (barcodes.length > 0) {
+          barcodeValue = barcodes[0].rawValue;
+
+          console.log("NATIVE BARCODE FOUND:", barcodes[0]);
+        }
       }
-    );
-  };
+
+      // ZXing fallback
+      if (!barcodeValue) {
+        const result = await readerRef.current.decodeFromCanvas(canvas);
+
+        barcodeValue = result.getText();
+
+        console.log({
+          text: result.getText(),
+          format: result.getBarcodeFormat(),
+        });
+
+        console.log("ZXING BARCODE FOUND:", barcodeValue);
+      }
+
+      if (!barcodeValue) return;
+
+      isProcessingRef.current = true;
+
+      stopStream();
+
+      setPhase("found");
+      setFoundText("Looking up product…");
+
+      const name = await lookupBarcode(barcodeValue);
+
+      const label = name || `Barcode: ${barcodeValue}`;
+
+      setFoundText(label);
+
+      setTimeout(() => {
+        onResult(name || barcodeValue);
+        onClose();
+      }, 900);
+
+    } catch {
+      // no barcode detected yet
+    }
+  }, 300);
+};
 
   const stopCamera   = () => { stopStream(); setPhase("stopped"); };
   const resumeCamera = () => startCamera(useFront);
