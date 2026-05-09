@@ -56,6 +56,10 @@ export default function BarcodeScanner({ onResult, onClose }) {
         setHasFront(devices.filter((d) => d.kind === "videoinput").length > 1);
       } catch { /* ignore */ }
 
+      setPhase("scanning");
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       const video = videoRef.current;
       if (video) {
         video.muted = true;
@@ -80,7 +84,6 @@ export default function BarcodeScanner({ onResult, onClose }) {
         }
       }
 
-      setPhase("scanning");
       beginScanLoop();
 
     } catch (err) {
@@ -165,6 +168,19 @@ export default function BarcodeScanner({ onResult, onClose }) {
             <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🚫</div>
             <h3 style={{ margin: "0 0 10px", color: "#ff8a80" }}>Camera access blocked</h3>
             <p style={{ color: "#888", lineHeight: 1.6, fontSize: "0.9rem", marginBottom: "20px" }}>Enable camera access for this site:</p>
+            <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
+              {[
+                { icon: "🍎", label: "iPhone · Safari",  step: "Settings app → Safari → Camera → Allow" },
+                { icon: "🍎", label: "iPhone · Chrome",  step: "Settings app → Chrome → Camera → toggle on" },
+                { icon: "🤖", label: "Android · Chrome", step: "Tap 🔒 in address bar → Permissions → Camera → Allow" },
+                { icon: "💻", label: "Desktop",          step: "Tap 🔒 in address bar → Camera → Allow" },
+              ].map(({ icon, label, step }) => (
+                <div key={label} style={{ padding: "12px 14px", borderRadius: "12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <p style={{ margin: "0 0 3px", color: "#fff", fontSize: "0.85rem", fontWeight: 700 }}>{icon} {label}</p>
+                  <p style={{ margin: 0, color: "#888", fontSize: "0.78rem" }}>{step}</p>
+                </div>
+              ))}
+            </div>
             <button onClick={() => startCamera(false)} style={whiteBtn}>Try again</button>
             <button onClick={onClose} style={ghostBtn}>Search manually instead</button>
           </div>
