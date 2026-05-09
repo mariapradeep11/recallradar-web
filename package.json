@@ -11,7 +11,8 @@
   "dependencies": {
     "@react-three/drei": "^9.105.4",
     "@react-three/fiber": "^8.17.10",
-    "@zxing/library": "^0.23.0",
+    "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.22.0",
     "framer-motion": "^11.2.10",
     "html5-qrcode": "^2.3.8",
     "react": "^18.3.1",
