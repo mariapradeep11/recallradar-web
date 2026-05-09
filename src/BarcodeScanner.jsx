@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/library";
+import { BrowserMultiFormatReader, BarcodeFormat,DecodeHintType,} from "@zxing/library";
 
 async function lookupBarcode(barcode) {
   try {
@@ -19,7 +19,16 @@ export default function BarcodeScanner({ onResult, onClose }) {
   const videoRef    = useRef(null);
   const canvasRef   = useRef(null);
   const streamRef   = useRef(null);
-  const readerRef   = useRef(new BrowserMultiFormatReader());
+  const hints = new Map();
+hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+  BarcodeFormat.UPC_A,
+  BarcodeFormat.UPC_E,
+  BarcodeFormat.EAN_13,
+  BarcodeFormat.EAN_8,
+  BarcodeFormat.CODE_128,
+]);
+
+const readerRef = useRef(new BrowserMultiFormatReader(hints));
   const scanLoopRef = useRef(null);
 
   const [phase, setPhase]             = useState("idle");
@@ -118,7 +127,7 @@ export default function BarcodeScanner({ onResult, onClose }) {
           setTimeout(() => { onResult(name || barcode); onClose(); }, 900);
         }
       } catch { /* no barcode in frame yet */ }
-    }, 400);
+    }, 150);
   };
 
   const stopCamera   = () => { stopStream(); setPhase("stopped"); };
