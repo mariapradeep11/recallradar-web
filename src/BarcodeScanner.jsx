@@ -23,15 +23,6 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
   hints.set(DecodeHintType.TRY_HARDER, true);
 
-  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-    BarcodeFormat.UPC_A,
-    BarcodeFormat.UPC_E,
-    BarcodeFormat.EAN_13,
-    BarcodeFormat.EAN_8,
-    BarcodeFormat.CODE_128,
-    BarcodeFormat.CODE_39,
-    BarcodeFormat.ITF,
-  ]);
 
   const readerRef = useRef(new BrowserMultiFormatReader(hints));
   const scanLoopRef = useRef(null);
