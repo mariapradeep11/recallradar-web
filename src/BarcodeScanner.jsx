@@ -44,7 +44,6 @@ export default function BarcodeScanner({ onResult, onClose }) {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: front ? "user" : { ideal: "environment" },
-          // Explicit size helps iOS render the video correctly
           width:  { ideal: 1280 },
           height: { ideal: 720 },
         },
@@ -59,30 +58,24 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
       const video = videoRef.current;
       if (video) {
-        // ── iOS Safari critical fixes ──────────────────────────────────────
-        // 1. srcObject must be set before play()
-        // 2. muted must be true (iOS blocks autoplay with audio)
-        // 3. playsInline prevents fullscreen takeover on iOS
-        // 4. Explicit width/height prevents black frame
-        video.srcObject = stream;
         video.muted = true;
         video.playsInline = true;
+        video.setAttribute("playsinline", "true");
+        video.setAttribute("webkit-playsinline", "true");
+        video.srcObject = stream;
 
-        // Wait for metadata so iOS knows the video dimensions
         await new Promise((resolve) => {
           video.onloadedmetadata = () => {
             video.width  = video.videoWidth  || 640;
             video.height = video.videoHeight || 480;
             resolve();
           };
-          // Fallback if metadata already loaded
           if (video.readyState >= 1) resolve();
         });
 
         try {
           await video.play();
         } catch (playErr) {
-          // Some iOS versions need a user-gesture retry
           console.warn("video.play() failed:", playErr);
         }
       }
@@ -131,7 +124,6 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
   useEffect(() => () => stopStream(), []);
 
-  // ── Styles ────────────────────────────────────────────────────────────────
   const primaryBtn = { width: "100%", padding: "15px", borderRadius: "14px", background: "#ff3b30", color: "#fff", border: "none", fontWeight: 900, cursor: "pointer", fontSize: "1rem" };
   const whiteBtn   = { width: "100%", padding: "15px", borderRadius: "14px", background: "#fff", color: "#000", border: "none", fontWeight: 900, cursor: "pointer" };
   const ghostBtn   = { width: "100%", marginTop: "10px", padding: "12px", borderRadius: "14px", background: "transparent", color: "#666", border: "none", cursor: "pointer" };
@@ -141,13 +133,11 @@ export default function BarcodeScanner({ onResult, onClose }) {
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 200, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "420px", background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "24px", overflow: "hidden" }}>
 
-        {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           <span style={{ fontWeight: 800, fontSize: "1rem" }}>📷 Scan a barcode</span>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", borderRadius: "999px", width: "32px", height: "32px", cursor: "pointer", fontSize: "1rem" }}>✕</button>
         </div>
 
-        {/* IDLE */}
         {phase === "idle" && (
           <div style={{ padding: "32px 24px", textAlign: "center" }}>
             <div style={{ fontSize: "3.5rem", marginBottom: "16px" }}>📷</div>
@@ -160,7 +150,6 @@ export default function BarcodeScanner({ onResult, onClose }) {
           </div>
         )}
 
-        {/* STARTING */}
         {phase === "starting" && (
           <div style={{ padding: "40px 24px", textAlign: "center" }}>
             <div style={{ fontSize: "2.5rem", marginBottom: "16px" }}>⏳</div>
@@ -171,31 +160,16 @@ export default function BarcodeScanner({ onResult, onClose }) {
           </div>
         )}
 
-        {/* DENIED */}
         {phase === "denied" && (
           <div style={{ padding: "32px 24px", textAlign: "center" }}>
             <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🚫</div>
             <h3 style={{ margin: "0 0 10px", color: "#ff8a80" }}>Camera access blocked</h3>
             <p style={{ color: "#888", lineHeight: 1.6, fontSize: "0.9rem", marginBottom: "20px" }}>Enable camera access for this site:</p>
-            <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
-              {[
-                { icon: "🍎", label: "iPhone · Safari",  step: "Settings app → Safari → Camera → Allow" },
-                { icon: "🍎", label: "iPhone · Chrome",  step: "Settings app → Chrome → Camera → toggle on" },
-                { icon: "🤖", label: "Android · Chrome", step: "Tap 🔒 in address bar → Permissions → Camera → Allow" },
-                { icon: "💻", label: "Desktop",          step: "Tap 🔒 in address bar → Camera → Allow" },
-              ].map(({ icon, label, step }) => (
-                <div key={label} style={{ padding: "12px 14px", borderRadius: "12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <p style={{ margin: "0 0 3px", color: "#fff", fontSize: "0.85rem", fontWeight: 700 }}>{icon} {label}</p>
-                  <p style={{ margin: 0, color: "#888", fontSize: "0.78rem" }}>{step}</p>
-                </div>
-              ))}
-            </div>
             <button onClick={() => startCamera(false)} style={whiteBtn}>Try again</button>
             <button onClick={onClose} style={ghostBtn}>Search manually instead</button>
           </div>
         )}
 
-        {/* IN USE */}
         {phase === "inuse" && (
           <div style={{ padding: "32px 24px", textAlign: "center" }}>
             <div style={{ fontSize: "3rem", marginBottom: "16px" }}>📹</div>
@@ -208,7 +182,6 @@ export default function BarcodeScanner({ onResult, onClose }) {
           </div>
         )}
 
-        {/* UNAVAILABLE */}
         {phase === "unavailable" && (
           <div style={{ padding: "32px 24px", textAlign: "center" }}>
             <div style={{ fontSize: "3rem", marginBottom: "16px" }}>📵</div>
@@ -226,50 +199,40 @@ export default function BarcodeScanner({ onResult, onClose }) {
           </div>
         )}
 
-        {/* SCANNING / FOUND / STOPPED */}
         {(phase === "scanning" || phase === "found" || phase === "stopped") && (
           <>
             <div style={{ position: "relative", background: "#111", width: "100%", aspectRatio: "1", overflow: "hidden" }}>
-              {/* 
-                iOS Safari critical: 
-                - playsInline as JSX prop AND html attribute
-                - explicit width/height 100% 
-                - autoPlay as JSX prop
-                - object-fit cover
-              */}
               <video
                 ref={videoRef}
                 playsInline
                 muted
                 autoPlay
+                webkit-playsinline="true"
                 style={{
                   position: "absolute",
                   inset: 0,
                   width: "100%",
                   height: "100%",
                   objectFit: "cover",
+                  background: "#000",
                   opacity: phase === "stopped" ? 0.25 : 1,
                   transition: "opacity 0.3s",
-                  // Force GPU layer — helps iOS render video in modal context
                   transform: "translateZ(0)",
                   WebkitTransform: "translateZ(0)",
+                  zIndex: 1,
                 }}
               />
               <canvas ref={canvasRef} style={{ display: "none" }} />
 
-              {/* Scan frame overlay */}
               {phase === "scanning" && (
-                <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-                  {/* Dark vignette outside scan area */}
+                <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2 }}>
                   <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)" }} />
-                  {/* Clear centre box */}
                   <div style={{
                     position: "absolute",
                     top: "20%", left: "15%", right: "15%", bottom: "20%",
                     boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
                     borderRadius: "8px",
                   }} />
-                  {/* Corner brackets */}
                   {[
                     { top: "20%", left: "15%", borderTop: "3px solid #ff3b30", borderLeft: "3px solid #ff3b30", borderRadius: "4px 0 0 0" },
                     { top: "20%", right: "15%", borderTop: "3px solid #ff3b30", borderRight: "3px solid #ff3b30", borderRadius: "0 4px 0 0" },
@@ -278,7 +241,6 @@ export default function BarcodeScanner({ onResult, onClose }) {
                   ].map((s, i) => (
                     <div key={i} style={{ position: "absolute", width: "32px", height: "32px", ...s }} />
                   ))}
-                  {/* Scan line */}
                   <div style={{
                     position: "absolute",
                     left: "15%", right: "15%", height: "2px",
@@ -288,24 +250,21 @@ export default function BarcodeScanner({ onResult, onClose }) {
                 </div>
               )}
 
-              {/* Found overlay */}
               {phase === "found" && (
-                <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.78)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px" }}>
+                <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.78)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", zIndex: 3 }}>
                   <div style={{ fontSize: "3rem" }}>✅</div>
                   <p style={{ color: "#fff", fontWeight: 800, textAlign: "center", padding: "0 24px", margin: 0 }}>{foundText}</p>
                 </div>
               )}
 
-              {/* Stopped overlay */}
               {phase === "stopped" && (
-                <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px" }}>
+                <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px", zIndex: 3 }}>
                   <p style={{ color: "#aaa", fontWeight: 700, margin: 0 }}>Camera paused</p>
                   <button onClick={resumeCamera} style={{ padding: "12px 28px", borderRadius: "999px", background: "#fff", color: "#000", border: "none", fontWeight: 900, cursor: "pointer" }}>Resume</button>
                 </div>
               )}
             </div>
 
-            {/* Controls */}
             <div style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
               <p style={{ color: "#555", fontSize: "0.78rem", margin: 0, flex: 1 }}>
                 {phase === "scanning" ? "Point barcode at the red frame" : ""}
