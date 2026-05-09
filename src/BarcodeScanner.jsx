@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader, BarcodeFormat,DecodeHintType,} from "@zxing/library";
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 async function lookupBarcode(barcode) {
   try {
@@ -20,15 +20,20 @@ export default function BarcodeScanner({ onResult, onClose }) {
   const canvasRef   = useRef(null);
   const streamRef   = useRef(null);
   const hints = new Map();
-hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-  BarcodeFormat.UPC_A,
-  BarcodeFormat.UPC_E,
-  BarcodeFormat.EAN_13,
-  BarcodeFormat.EAN_8,
-  BarcodeFormat.CODE_128,
-]);
 
-const readerRef = useRef(new BrowserMultiFormatReader(hints));
+  hints.set(DecodeHintType.TRY_HARDER, true);
+
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.UPC_A,
+    BarcodeFormat.UPC_E,
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.EAN_8,
+    BarcodeFormat.CODE_128,
+    BarcodeFormat.CODE_39,
+    BarcodeFormat.ITF,
+  ]);
+
+  const readerRef = useRef(new BrowserMultiFormatReader(hints));
   const scanLoopRef = useRef(null);
 
   const [phase, setPhase]             = useState("idle");
@@ -110,12 +115,40 @@ const readerRef = useRef(new BrowserMultiFormatReader(hints));
       const c = canvasRef.current;
       if (!v || !c || v.readyState < 2 || v.videoWidth === 0) return;
 
-      c.width  = v.videoWidth;
-      c.height = v.videoHeight;
-      c.getContext("2d").drawImage(v, 0, 0);
+      const ctx = c.getContext("2d");
+
+      const cropX = v.videoWidth * 0.10;
+      const cropY = v.videoHeight * 0.22;
+      const cropW = v.videoWidth * 0.80;
+      const cropH = v.videoHeight * 0.56;
+
+      c.width = cropW;
+      c.height = cropH;
+
+      ctx.drawImage(
+        v,
+        cropX,
+        cropY,
+        cropW,
+        cropH,
+        0,
+        0,
+        cropW,
+        cropH
+      );
 
       try {
-        const result = await readerRef.current.decodeFromCanvas(c);
+        let result;
+
+        try {
+          result = await readerRef.current.decodeFromCanvas(c);
+        } catch {
+          c.width = v.videoWidth;
+          c.height = v.videoHeight;
+          ctx.drawImage(v, 0, 0);
+          result = await readerRef.current.decodeFromCanvas(c);
+        }
+
         if (result) {
           stopStream();
           const barcode = result.getText();
@@ -127,7 +160,7 @@ const readerRef = useRef(new BrowserMultiFormatReader(hints));
           setTimeout(() => { onResult(name || barcode); onClose(); }, 900);
         }
       } catch { /* no barcode in frame yet */ }
-    }, 150);
+    }, 250);
   };
 
   const stopCamera   = () => { stopStream(); setPhase("stopped"); };
