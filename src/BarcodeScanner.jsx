@@ -35,6 +35,7 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
   const readerRef = useRef(new BrowserMultiFormatReader(hints));
   const scanLoopRef = useRef(null);
+  const isProcessingRef = useRef(false);
 
   const [phase, setPhase]             = useState("idle");
   const [foundText, setFoundText]     = useState("");
@@ -45,6 +46,8 @@ export default function BarcodeScanner({ onResult, onClose }) {
   const stopStream = () => {
     clearInterval(scanLoopRef.current);
     scanLoopRef.current = null;
+    isProcessingRef.current = false;
+    readerRef.current?.reset?.();
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
   };
@@ -110,57 +113,35 @@ export default function BarcodeScanner({ onResult, onClose }) {
   };
 
   const beginScanLoop = () => {
-    scanLoopRef.current = setInterval(async () => {
-      const v = videoRef.current;
-      const c = canvasRef.current;
-      if (!v || !c || v.readyState < 2 || v.videoWidth === 0) return;
+    const video = videoRef.current;
+    if (!video) return;
 
-      const ctx = c.getContext("2d");
+    readerRef.current.decodeFromVideoElementContinuously(
+      video,
+      async (result) => {
+        if (!result || isProcessingRef.current) return;
 
-      const cropX = v.videoWidth * 0.10;
-      const cropY = v.videoHeight * 0.22;
-      const cropW = v.videoWidth * 0.80;
-      const cropH = v.videoHeight * 0.56;
+        isProcessingRef.current = true;
 
-      c.width = cropW;
-      c.height = cropH;
+        stopStream();
 
-      ctx.drawImage(
-        v,
-        cropX,
-        cropY,
-        cropW,
-        cropH,
-        0,
-        0,
-        cropW,
-        cropH
-      );
+        const barcode = result.getText();
+        console.log("BARCODE FOUND:", barcode);
 
-      try {
-        let result;
+        setPhase("found");
+        setFoundText("Looking up product…");
 
-        try {
-          result = await readerRef.current.decodeFromCanvas(c);
-        } catch {
-          c.width = v.videoWidth;
-          c.height = v.videoHeight;
-          ctx.drawImage(v, 0, 0);
-          result = await readerRef.current.decodeFromCanvas(c);
-        }
+        const name = await lookupBarcode(barcode);
+        const label = name || `Barcode: ${barcode}`;
 
-        if (result) {
-          stopStream();
-          const barcode = result.getText();
-          setPhase("found");
-          setFoundText("Looking up product…");
-          const name  = await lookupBarcode(barcode);
-          const label = name || `Barcode: ${barcode}`;
-          setFoundText(label);
-          setTimeout(() => { onResult(name || barcode); onClose(); }, 900);
-        }
-      } catch { /* no barcode in frame yet */ }
-    }, 250);
+        setFoundText(label);
+
+        setTimeout(() => {
+          onResult(name || barcode);
+          onClose();
+        }, 900);
+      }
+    );
   };
 
   const stopCamera   = () => { stopStream(); setPhase("stopped"); };
