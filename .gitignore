@@ -25,3 +25,4 @@ dist-ssr
 src/App.tsx
 src/App.tsx
 .vercel
+.env*.local

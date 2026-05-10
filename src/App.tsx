@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import RiskIntelligence from "./RiskIntelligence";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Float, OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
@@ -93,7 +94,8 @@ const getSeverity = (reason?: string): Severity => {
     normalized.includes("salmonella") ||
     normalized.includes("death") ||
     normalized.includes("seizure") ||
-    normalized.includes("contamination")
+    normalized.includes("contamination") ||
+    normalized.includes("serious injury")
   ) {
     return "HIGH";
   }
@@ -103,7 +105,9 @@ const getSeverity = (reason?: string): Severity => {
     normalized.includes("allergen") ||
     normalized.includes("metal") ||
     normalized.includes("glass") ||
-    normalized.includes("chemical")
+    normalized.includes("chemical") ||
+    normalized.includes("fall") ||
+    normalized.includes("burn")
   ) {
     return "MEDIUM";
   }
@@ -216,23 +220,6 @@ function ThreeHero() {
     </div>
   );
 }
-
-const getProductVisual = (category: Category, product = "") => {
-  const text = product.toLowerCase();
-
-  if (category === "food") {
-    if (text.includes("chicken")) return "🍗";
-    if (text.includes("milk")) return "🥛";
-    if (text.includes("cheese")) return "🧀";
-    return "🥫";
-  }
-
-  if (category === "drug") return "💊";
-  if (category === "device") return "🩺";
-  if (category === "consumer") return "📦";
-
-  return "🔍";
-};
 
 export default function App() {
   const [query, setQuery] = useState("");
@@ -652,49 +639,6 @@ ${url}`;
                 <span style={arrowStyle}>→</span>
               </a>
             </div>
-
-            <div style={{ marginTop: "28px" }}>
-              <h4 style={{ marginBottom: "8px", color: "#fff" }}>
-                🧠 Recent safety signals
-              </h4>
-
-              <p style={{ color: "#888", fontSize: "14px", marginBottom: "14px" }}>
-                Early signals from news, public reports, and manufacturer activity.
-              </p>
-
-              <div
-                style={{
-                  background: "rgba(255,255,255,0.035)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  padding: "15px",
-                  borderRadius: "14px",
-                  marginBottom: "10px",
-                }}
-              >
-                <div style={{ color: "#ffb4ae", fontSize: "12px", marginBottom: "6px" }}>
-                  Recent • News signal
-                </div>
-                <div style={{ color: "#ddd", fontWeight: 700 }}>
-                  Search latest reports for “{query}” safety issues
-                </div>
-              </div>
-
-              <div
-                style={{
-                  background: "rgba(255,255,255,0.035)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  padding: "15px",
-                  borderRadius: "14px",
-                }}
-              >
-                <div style={{ color: "#ffcc66", fontSize: "12px", marginBottom: "6px" }}>
-                  Manufacturer • Recall notice
-                </div>
-                <div style={{ color: "#ddd", fontWeight: 700 }}>
-                  Check whether the brand has issued return or refund guidance
-                </div>
-              </div>
-            </div>
           </section>
         )}
 
@@ -771,6 +715,27 @@ ${url}`;
                   </p>
 
                   <p style={{ color: "#999", fontSize: "0.92rem" }}>{guidance.label}</p>
+
+                  <RiskIntelligence
+                    risk={{
+                      riskLevel: severity,
+                      why: [
+                        r.reason_for_recall || "Recall hazard detected",
+                      ],
+                      reportedImpact:
+                        "Official recall detected from government safety source.",
+                      recommendedAction:
+                        guidance.actions?.[0] ||
+                        "Review official recall instructions.",
+                      confidence: "High",
+                      plainEnglishSummary:
+                        r.reason_for_recall ||
+                        "Potential product safety issue detected.",
+                    }}
+                    loading={false}
+                    source="FDA"
+                    date={formatDate(r.report_date)}
+                  />
 
                   <div
                     style={{

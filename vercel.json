@@ -1,6 +1,13 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/((?!src/|@vite/|@react-refresh|node_modules/|assets/|vite.svg|favicon.ico).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
