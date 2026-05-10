@@ -6,6 +6,7 @@ import * as THREE from "three";
 import BarcodeScanner from "./BarcodeScanner.jsx";
 import HistoryPanel   from "./HistoryPanel.jsx";
 import { useHistory } from "./useHistory.js";
+import RiskIntelligence from "./RiskIntelligence.jsx";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,9 @@ const shortText = (text = "", limit = 140) =>
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 const escapeRegex = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const [riskById, setRiskById] = useState({});
+const [riskLoadingById, setRiskLoadingById] = useState({});
 
 const highlight = (text = "", query) => {
   if (!query.trim()) return text;
@@ -184,6 +188,59 @@ const getRecallGuidance = (recall) => {
   return getGuidance(recall.reason);
 };
 
+
+const analyzeRisks = async (hits) => {
+  const initialLoading = {};
+
+  hits.forEach((r) => {
+    initialLoading[r.id] = true;
+  });
+
+  setRiskLoadingById(initialLoading);
+  setRiskById({});
+
+  const settled = await Promise.allSettled(
+    hits.slice(0, 10).map(async (recall) => {
+      const res = await fetch("/api/analyze-risk", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ recall }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Risk API failed: ${res.status}`);
+      }
+
+      const risk = await res.json();
+
+      return [recall.id, risk];
+    })
+  );
+
+  const nextRisk = {};
+  const nextLoading = {};
+
+  settled.forEach((item) => {
+    if (item.status === "fulfilled") {
+      const [id, risk] = item.value;
+      nextRisk[id] = risk;
+      nextLoading[id] = false;
+    }
+  });
+
+  hits.forEach((r) => {
+    if (!(r.id in nextLoading)) {
+      nextLoading[r.id] = false;
+    }
+  });
+
+  setRiskById(nextRisk);
+  setRiskLoadingById(nextLoading);
+};
+
+
 // ─── Three.js ─────────────────────────────────────────────────────────────────
 
 function RecallOrb() {
@@ -322,6 +379,7 @@ export default function App() {
       }
 
       setResults(hits);
+      analyzeRisks(hits);
       logSearch(cat === "vehicle" ? `${vehicleYear} ${vehicleMake} ${vehicleModel}` : searchTerm, cat, hits.length);
     } catch (err) {
       setError(err.name === "TypeError"
@@ -628,6 +686,10 @@ export default function App() {
                     <strong style={{ color: "#fff" }}>Reason:</strong>{" "}
                     {highlight(shortText(r.reason || "No data", 180), query)}
                   </p>
+                  <RiskIntelligence
+                    risk={riskById[r.id]}
+                    loading={riskLoadingById[r.id]}
+                  />
                   <p style={{ color: "#999", fontSize: "0.92rem" }}>{guidance.label}</p>
 
                   <div style={{ marginTop: "18px", padding: "18px", borderRadius: "18px", background: "rgba(0,0,0,0.28)", border: "1px solid rgba(255,255,255,0.08)", textAlign: "left" }}>
