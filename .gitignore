@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 src/App.tsx
 src/App.tsx
+.vercel

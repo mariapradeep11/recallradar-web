@@ -191,12 +191,13 @@ const analyzeRisks = async (hits) => {
   const initialLoading = {};
 
   hits.forEach((r) => {
-    initialLoading[r.id] = true;
+    initialLoading[r.id || r.title] = true;
   });
 
   setRiskLoadingById(initialLoading);
   setRiskById({});
 
+  
   const settled = await Promise.allSettled(
     hits.slice(0, 10).map(async (recall) => {
       const res = await fetch("/api/analyze-risk", {
@@ -213,7 +214,9 @@ const analyzeRisks = async (hits) => {
 
       const risk = await res.json();
 
-      return [recall.id, risk];
+      console.log("Risk response:", risk);
+
+      return [recall.id || recall.title, risk];
     })
   );
 
@@ -688,8 +691,8 @@ export default function App() {
                     {highlight(shortText(r.reason || "No data", 180), query)}
                   </p>
                   <RiskIntelligence
-                    risk={riskById[r.id]}
-                    loading={riskLoadingById[r.id]}
+                    risk={riskById[cardId]}
+                    loading={riskLoadingById[cardId]}
                   />
                   <p style={{ color: "#999", fontSize: "0.92rem" }}>{guidance.label}</p>
 
