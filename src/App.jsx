@@ -719,7 +719,13 @@ export default function App() {
                     {highlight(shortText(r.reason || "No data", 180), query)}
                   </p>
 
-                  <RiskIntelligence risk={riskById[cardId]} loading={riskLoadingById[cardId]} />
+                  <RiskIntelligence
+  risk={riskById[cardId]}
+  loading={riskLoadingById[cardId]}
+  source={r.source}
+  date={r.date}
+  sourceContext={riskById[cardId]?.sourceContext}
+/>
 
                   <p style={{ color: "#999", fontSize: "0.92rem" }}>{guidance.label}</p>
 

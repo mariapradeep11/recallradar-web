@@ -43,6 +43,15 @@ function buildActionSteps(risk) {
     ];
   }
 
+  if (text.includes("allerg")) {
+    return [
+      "Avoid this product if you have relevant allergies or sensitivities",
+      "Check the ingredient label and product identifiers",
+      "Verify whether your exact product is affected",
+      risk.recommendedAction,
+    ];
+  }
+
   return [
     "Review official recall details carefully",
     "Verify product identifiers and batch details",
@@ -56,6 +65,7 @@ export default function RiskIntelligence({
   loading,
   source,
   date,
+  sourceContext,
 }) {
   const [open, setOpen] = useState(true);
 
@@ -126,7 +136,7 @@ export default function RiskIntelligence({
               marginBottom: "10px",
             }}
           >
-            ⚠️ {risk.riskLevel} RISK
+            ⚠️ {risk.contextualLabel || `${risk.riskLevel} RISK`}
           </div>
 
           <div style={{ fontWeight: 900, fontSize: "1.05rem" }}>
@@ -138,10 +148,24 @@ export default function RiskIntelligence({
               color: "#8a8a8f",
               fontSize: "0.82rem",
               marginTop: "4px",
+              lineHeight: 1.45,
             }}
           >
             AI-assisted safety analysis based on official recall details
           </div>
+
+          {risk.riskQualifier && (
+            <div
+              style={{
+                color: "#b8b8be",
+                fontSize: "0.82rem",
+                marginTop: "6px",
+                lineHeight: 1.45,
+              }}
+            >
+              {risk.riskQualifier}
+            </div>
+          )}
 
           {(source || date) && (
             <div
@@ -182,7 +206,7 @@ export default function RiskIntelligence({
             >
               <div>
                 <strong style={{ display: "block", marginBottom: "10px" }}>
-                  Severity drivers
+                  Key safety signals
                 </strong>
 
                 <div
@@ -238,7 +262,8 @@ export default function RiskIntelligence({
                   </div>
 
                   <div style={{ color: "#fff", lineHeight: 1.5 }}>
-                    {risk.reportedImpact}
+                    {risk.reportedImpact ||
+                      "No reported impact count found in available recall details."}
                   </div>
                 </div>
 
@@ -262,7 +287,7 @@ export default function RiskIntelligence({
                   </div>
 
                   <div style={{ color: "#fff", lineHeight: 1.5 }}>
-                    {risk.confidence} confidence
+                    {risk.confidence || "Medium"} confidence
                   </div>
 
                   <div
@@ -299,7 +324,7 @@ export default function RiskIntelligence({
                 <div style={{ display: "grid", gap: "10px" }}>
                   {actionSteps.map((step, idx) => (
                     <div
-                      key={step}
+                      key={`${step}-${idx}`}
                       style={{
                         padding: "11px 12px",
                         borderRadius: "13px",
@@ -317,6 +342,105 @@ export default function RiskIntelligence({
                   ))}
                 </div>
               </div>
+
+              {sourceContext && (
+                <div
+                  style={{
+                    padding: "15px",
+                    borderRadius: "16px",
+                    background: "rgba(255,255,255,0.035)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    color: "#c9c9cf",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  <strong style={{ color: "#fff" }}>
+                    What RecallRadar checked
+                  </strong>
+
+                  <div style={{ marginTop: "10px", color: "#aaa" }}>
+                    {sourceContext.sourceName && (
+                      <div>✔ Source: {sourceContext.sourceName}</div>
+                    )}
+                    {sourceContext.sourceType && (
+                      <div>✔ Type: {sourceContext.sourceType}</div>
+                    )}
+                  </div>
+
+                  {Array.isArray(sourceContext.checkedFields) && (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                        marginTop: "12px",
+                      }}
+                    >
+                      {sourceContext.checkedFields.map((field) => (
+                        <span
+                          key={field}
+                          style={{
+                            padding: "7px 10px",
+                            borderRadius: "999px",
+                            background: "rgba(255,255,255,0.055)",
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            fontSize: "0.78rem",
+                            color: "#ddd",
+                          }}
+                        >
+                          {field}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {sourceContext.note && (
+                    <p
+                      style={{
+                        color: "#888",
+                        margin: "12px 0 0",
+                        fontSize: "0.85rem",
+                      }}
+                    >
+                      {sourceContext.note}
+                    </p>
+                  )}
+
+                  {Array.isArray(sourceContext.trustedSources) &&
+                    sourceContext.trustedSources.length > 0 && (
+                      <div style={{ marginTop: "14px" }}>
+                        <strong style={{ color: "#fff", fontSize: "0.9rem" }}>
+                          Trusted source links
+                        </strong>
+
+                        <div
+                          style={{
+                            display: "grid",
+                            gap: "8px",
+                            marginTop: "10px",
+                          }}
+                        >
+                          {sourceContext.trustedSources.map((link) => (
+                            <a
+                              key={link.label}
+                              href={link.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                color: "#ffb4ae",
+                                textDecoration: "none",
+                                fontWeight: 800,
+                                fontSize: "0.88rem",
+                              }}
+                            >
+                              {link.label} →
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                </div>
+              )}
 
               {risk.plainEnglishSummary && (
                 <div
