@@ -35,8 +35,6 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 const escapeRegex = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const [riskById, setRiskById] = useState({});
-const [riskLoadingById, setRiskLoadingById] = useState({});
 
 const highlight = (text = "", query) => {
   if (!query.trim()) return text;
@@ -308,6 +306,9 @@ export default function App() {
   const [vehicleYear, setVehicleYear]         = useState("");
   const [vehicleMake, setVehicleMake]         = useState("");
   const [vehicleModel, setVehicleModel]       = useState("");
+
+  const [riskById, setRiskById] = useState({});
+  const [riskLoadingById, setRiskLoadingById] = useState({});
 
   const {
     searchHistory, savedSearches, alertHistory,
