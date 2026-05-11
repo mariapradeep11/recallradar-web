@@ -5,7 +5,7 @@
       "destination": "/api/$1"
     },
     {
-      "source": "/((?!src/|@vite/|@react-refresh|node_modules/|assets/|vite.svg|favicon.ico).*)",
+      "source": "/((?!api/|src/|@vite/|@react-refresh|node_modules/|assets/|vite.svg|favicon.ico).*)",
       "destination": "/index.html"
     }
   ],
@@ -13,9 +13,18 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
       ]
     }
   ]

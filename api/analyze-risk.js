@@ -14,10 +14,43 @@ function safeJsonParse(text) {
   }
 }
 
+function isValidUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function cleanText(value, fallback = "") {
+  if (typeof value !== "string") return fallback;
+
+  const trimmed = value.trim();
+
+  if (!trimmed) return fallback;
+
+  const invalidPhrases = [
+    "not found",
+    "not available",
+    "not provided",
+    "unknown",
+    "n/a",
+    "none",
+    "null",
+  ];
+
+  if (invalidPhrases.includes(trimmed.toLowerCase())) {
+    return fallback;
+  }
+
+  return trimmed;
+}
+
 function buildTrustedSources(recall = {}) {
   const trustedSources = [];
 
-  if (recall.url) {
+  if (isValidUrl(recall.url)) {
     trustedSources.push({
       label: `Official ${recall.source || "recall"} notice`,
       url: recall.url,
@@ -88,7 +121,7 @@ function buildSourceContext(recall = {}) {
   return {
     sourceName,
     sourceType: "Official recall data",
-    sourceUrl: recall.url || "",
+    sourceUrl: isValidUrl(recall.url) ? recall.url : "",
     checkedFields,
     note:
       recall.category === "vehicle"
@@ -119,6 +152,42 @@ function buildMinimalFallbackRisk(recall = {}) {
   };
 }
 
+function normalizeSourceContext(parsedSourceContext = {}, recall = {}) {
+  const base = buildSourceContext(recall);
+
+  const parsedTrustedSources = Array.isArray(parsedSourceContext.trustedSources)
+    ? parsedSourceContext.trustedSources
+        .filter((link) => link && isValidUrl(link.url))
+        .map((link) => ({
+          label: cleanText(link.label, "Trusted source"),
+          url: link.url,
+          type: cleanText(link.type, "official"),
+        }))
+    : [];
+
+  const trustedSources =
+    parsedTrustedSources.length > 0 ? parsedTrustedSources : base.trustedSources;
+
+  const parsedCheckedFields = Array.isArray(parsedSourceContext.checkedFields)
+    ? parsedSourceContext.checkedFields
+        .map((field) => cleanText(field))
+        .filter(Boolean)
+    : [];
+
+  return {
+    ...base,
+    sourceName: cleanText(parsedSourceContext.sourceName, base.sourceName),
+    sourceType: cleanText(parsedSourceContext.sourceType, base.sourceType),
+    sourceUrl: isValidUrl(parsedSourceContext.sourceUrl)
+      ? parsedSourceContext.sourceUrl
+      : base.sourceUrl,
+    checkedFields:
+      parsedCheckedFields.length > 0 ? parsedCheckedFields : base.checkedFields,
+    note: cleanText(parsedSourceContext.note, base.note),
+    trustedSources,
+  };
+}
+
 function normalizeRiskResponse(parsed = {}, recall = {}) {
   const fallback = buildMinimalFallbackRisk(recall);
 
@@ -127,7 +196,7 @@ function normalizeRiskResponse(parsed = {}, recall = {}) {
     : fallback.riskLevel;
 
   const contextualLabel =
-    parsed.contextualLabel ||
+    cleanText(parsed.contextualLabel) ||
     (riskLevel === "HIGH"
       ? "HIGH RISK"
       : riskLevel === "MEDIUM"
@@ -140,30 +209,23 @@ function normalizeRiskResponse(parsed = {}, recall = {}) {
     riskLevel,
     contextualLabel,
     riskQualifier:
-      parsed.riskQualifier ||
+      cleanText(parsed.riskQualifier) ||
       "RecallRadar analyzed the official recall notice for consumer safety signals.",
     why:
       Array.isArray(parsed.why) && parsed.why.length > 0
-        ? parsed.why.slice(0, 6)
+        ? parsed.why.map((item) => cleanText(item)).filter(Boolean).slice(0, 6)
         : fallback.why,
     reportedImpact:
-      parsed.reportedImpact ||
+      cleanText(parsed.reportedImpact) ||
       "No specific injury or incident count was found in the provided recall details.",
     recommendedAction:
-      parsed.recommendedAction ||
+      cleanText(parsed.recommendedAction) ||
       "Review the official recall source and verify whether your exact product is affected.",
-    confidence: parsed.confidence || "Medium",
+    confidence: cleanText(parsed.confidence, "Medium"),
     plainEnglishSummary:
-      parsed.plainEnglishSummary ||
+      cleanText(parsed.plainEnglishSummary) ||
       "RecallRadar analyzed the official recall notice and summarized the key safety signals.",
-    sourceContext: {
-      ...buildSourceContext(recall),
-      ...(parsed.sourceContext || {}),
-      trustedSources:
-        parsed.sourceContext?.trustedSources?.length > 0
-          ? parsed.sourceContext.trustedSources
-          : buildTrustedSources(recall),
-    },
+    sourceContext: normalizeSourceContext(parsed.sourceContext || {}, recall),
     aiStatus: "ai_generated",
     aiMessage:
       "RecallRadar AI analyzed official recall details. No external web search was used.",
@@ -203,6 +265,7 @@ Important rules:
 - You may reason from the official recall text, but keep the explanation grounded.
 - For allergen recalls, do not call it simply LOW if it may be serious for allergy-sensitive consumers. Use CONTEXTUAL RISK when appropriate.
 - For vehicle recalls, mention that year/make/model matches should be confirmed with VIN or license plate lookup.
+- For sourceContext.sourceUrl and trustedSources URLs, only return valid http or https URLs. If no valid URL exists, return an empty string or an empty array.
 - Return strict JSON only. No markdown. No extra commentary.
 
 Required JSON shape:
@@ -218,13 +281,13 @@ Required JSON shape:
   "sourceContext": {
     "sourceName": "FDA | CPSC | NHTSA | Official Source",
     "sourceType": "Official recall data",
-    "sourceUrl": "official source URL if available",
+    "sourceUrl": "valid official source URL or empty string",
     "checkedFields": ["hazard", "reason", "remedy", "reported impact"],
     "note": "short trust note",
     "trustedSources": [
       {
         "label": "Official recall notice",
-        "url": "source URL",
+        "url": "valid http or https URL only",
         "type": "official"
       }
     ]
@@ -265,14 +328,30 @@ ${JSON.stringify(recall, null, 2)}
       }
     );
 
-    if (!geminiRes.ok) {
-      return res.status(200).json({
-        ...buildMinimalFallbackRisk(recall),
-        aiStatus: "fallback_after_ai_error",
-        aiMessage:
-          "AI analysis was unavailable, so RecallRadar returned a minimal official-source fallback.",
-      });
-    }
+if (!geminiRes.ok) {
+  const errorText = await geminiRes.text();
+
+  console.error("Gemini API failed:", {
+    status: geminiRes.status,
+    statusText: geminiRes.statusText,
+    errorText,
+  });
+
+  return res.status(200).json({
+    ...buildMinimalFallbackRisk(recall),
+    aiStatus: "fallback_after_ai_error",
+    aiMessage:
+      "AI analysis was unavailable, so RecallRadar returned a minimal official-source fallback.",
+    debug:
+      process.env.NODE_ENV !== "production"
+        ? {
+            status: geminiRes.status,
+            statusText: geminiRes.statusText,
+            errorText,
+          }
+        : undefined,
+  });
+}
 
     const data = await geminiRes.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
