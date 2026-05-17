@@ -35,32 +35,117 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 const escapeRegex = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const getRiskCacheKey = (recall = {}) => {
+  const base = [
+    recall.source || "",
+    recall.category || "",
+    recall.id || "",
+    recall.title || "",
+    recall.date || "",
+    recall.rawDate || "",
+  ]
+    .join("|")
+    .toLowerCase();
+
+  return `recallradar:risk:${base}`;
+};
+
+const readCachedRisk = (recall) => {
+  try {
+    const raw = localStorage.getItem(getRiskCacheKey(recall));
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed?.risk) return null;
+
+    return parsed.risk;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedRisk = (recall, risk) => {
+  try {
+    if (!risk || risk.aiStatus?.startsWith("fallback")) return;
+    if (risk.aiStatus === "frontend_ai_unavailable") return;
+
+    localStorage.setItem(
+      getRiskCacheKey(recall),
+      JSON.stringify({
+        risk,
+        cachedAt: new Date().toISOString(),
+      })
+    );
+  } catch {
+    // localStorage can fail in private mode or quota-limited browsers.
+  }
+};
+
+const buildUnavailableRisk = (recall) => ({
+  riskLevel: "UNAVAILABLE",
+  contextualLabel: "AI UNAVAILABLE",
+  riskQualifier:
+    "AI risk analysis is temporarily unavailable. Official recall details are still shown below.",
+  why: ["AI analysis temporarily unavailable"],
+  reportedImpact:
+    "Reported impact was not analyzed because AI analysis is temporarily unavailable.",
+  recommendedAction:
+    "Review the official recall source and follow the recall instructions.",
+  confidence: "Limited",
+  plainEnglishSummary:
+    "RecallRadar could not complete AI analysis for this recall right now.",
+  aiStatus: "frontend_ai_unavailable",
+  sourceContext: {
+    sourceName: recall.source || "Official Source",
+    sourceType: "Official recall data",
+    sourceUrl: recall.url || "",
+    checkedFields: ["official recall record"],
+    note:
+      "RecallRadar analyzes official recall data. AI analysis may be temporarily unavailable.",
+    trustedSources: recall.url
+      ? [
+          {
+            label: `Official ${recall.source || "recall"} source`,
+            url: recall.url,
+            type: "official",
+          },
+        ]
+      : [],
+  },
+});
+
 const highlight = (text = "", query) => {
   if (!query.trim()) return text;
+
   const regex = new RegExp(`(${escapeRegex(query.trim())})`, "gi");
+
   return text.split(regex).map((part, i) =>
-    part.toLowerCase() === query.trim().toLowerCase()
-      ? (
-        <span
-          key={i}
-          style={{
-            background: "#ff3b30",
-            color: "#fff",
-            padding: "2px 5px",
-            borderRadius: "5px",
-          }}
-        >
-          {part}
-        </span>
-      )
-      : part
+    part.toLowerCase() === query.trim().toLowerCase() ? (
+      <span
+        key={i}
+        style={{
+          background: "#ff3b30",
+          color: "#fff",
+          padding: "2px 5px",
+          borderRadius: "5px",
+        }}
+      >
+        {part}
+      </span>
+    ) : (
+      part
+    )
   );
 };
 
 const getGuidance = (reason = "") => {
   const r = reason.toLowerCase();
 
-  if (r.includes("salmonella") || r.includes("listeria") || r.includes("contamination")) {
+  if (
+    r.includes("salmonella") ||
+    r.includes("listeria") ||
+    r.includes("contamination")
+  ) {
     return {
       label: "Potential illness risk",
       actions: [
@@ -102,8 +187,10 @@ const formatDate = (date = "") => {
 
 const formatCpscDate = (date = "") => {
   if (!date) return "N/A";
+
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return date;
+
   return d.toLocaleDateString();
 };
 
@@ -116,20 +203,16 @@ const normalizeFdaRecall = (r, cat, i) => ({
   company: r.recalling_firm || "Unknown",
   date: formatDate(r.report_date),
   rawDate: r.report_date || "",
-  url: `https://www.accessdata.fda.gov/scripts/ires/index.cfm?Product=${encodeURIComponent(r.product_description || "")}`,
+  url: `https://www.accessdata.fda.gov/scripts/ires/index.cfm?Product=${encodeURIComponent(
+    r.product_description || ""
+  )}`,
   raw: r,
 });
 
 const normalizeCpscRecall = (r, i) => {
-  const product =
-    r.Products?.[0]?.Name ||
-    r.Title ||
-    "Consumer product recall";
-
+  const product = r.Products?.[0]?.Name || r.Title || "Consumer product recall";
   const manufacturer =
-    r.Manufacturers?.[0]?.Name ||
-    r.Manufacturer ||
-    "Unknown";
+    r.Manufacturers?.[0]?.Name || r.Manufacturer || "Unknown";
 
   return {
     id: `cpsc-${r.RecallNumber || i}`,
@@ -149,17 +232,28 @@ const normalizeNhtsaRecall = (r, i) => ({
   id: `nhtsa-${r.NHTSACampaignNumber || i}`,
   source: "NHTSA",
   category: "vehicle",
-  title: `${r.ModelYear || ""} ${r.Make || ""} ${r.Model || ""} — ${r.Component || "Vehicle recall"}`.trim(),
-  reason: r.Summary || r.Conequence || r.Consequence || r.Notes || "No recall summary provided.",
+  title: `${r.ModelYear || ""} ${r.Make || ""} ${r.Model || ""} — ${
+    r.Component || "Vehicle recall"
+  }`.trim(),
+  reason:
+    r.Summary ||
+    r.Conequence ||
+    r.Consequence ||
+    r.Notes ||
+    "No recall summary provided.",
   company: r.Manufacturer || "Unknown",
   date: r.ReportReceivedDate || "N/A",
   rawDate: r.ReportReceivedDate || "",
-  url: `https://www.nhtsa.gov/recalls?nhtsaId=${encodeURIComponent(r.NHTSACampaignNumber || "")}`,
+  url: `https://www.nhtsa.gov/recalls?nhtsaId=${encodeURIComponent(
+    r.NHTSACampaignNumber || ""
+  )}`,
   raw: r,
 });
 
 const getRecallSeverity = (recall) => {
-  const text = `${recall.reason || ""} ${recall.raw?.Consequence || ""} ${recall.raw?.Conequence || ""}`.toLowerCase();
+  const text = `${recall.reason || ""} ${recall.raw?.Consequence || ""} ${
+    recall.raw?.Conequence || ""
+  }`.toLowerCase();
 
   if (
     text.includes("death") ||
@@ -169,7 +263,9 @@ const getRecallSeverity = (recall) => {
     text.includes("choking") ||
     text.includes("listeria") ||
     text.includes("salmonella")
-  ) return "HIGH";
+  ) {
+    return "HIGH";
+  }
 
   if (
     text.includes("burn") ||
@@ -179,7 +275,9 @@ const getRecallSeverity = (recall) => {
     text.includes("glass") ||
     text.includes("airbag") ||
     text.includes("brake")
-  ) return "MEDIUM";
+  ) {
+    return "MEDIUM";
+  }
 
   return "LOW";
 };
@@ -219,8 +317,10 @@ function RecallOrb() {
 
   useFrame((state) => {
     if (!groupRef.current) return;
+
     groupRef.current.rotation.y = state.clock.elapsedTime * 0.35;
-    groupRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.4) * 0.18;
+    groupRef.current.rotation.x =
+      Math.sin(state.clock.elapsedTime * 0.4) * 0.18;
   });
 
   return (
@@ -228,12 +328,24 @@ function RecallOrb() {
       <Float speed={1.6} rotationIntensity={0.4} floatIntensity={0.9}>
         <mesh>
           <icosahedronGeometry args={[1.4, 2]} />
-          <meshStandardMaterial color="#ff3b30" emissive="#7a0f0a" roughness={0.25} metalness={0.65} />
+          <meshStandardMaterial
+            color="#ff3b30"
+            emissive="#7a0f0a"
+            roughness={0.25}
+            metalness={0.65}
+          />
         </mesh>
+
         <mesh scale={1.22}>
           <icosahedronGeometry args={[1.4, 1]} />
-          <meshBasicMaterial color="#ff3b30" wireframe transparent opacity={0.22} />
+          <meshBasicMaterial
+            color="#ff3b30"
+            wireframe
+            transparent
+            opacity={0.22}
+          />
         </mesh>
+
         <mesh scale={1.65}>
           <sphereGeometry args={[1.4, 32, 32]} />
           <meshBasicMaterial color="#ff3b30" transparent opacity={0.06} />
@@ -245,7 +357,15 @@ function RecallOrb() {
 
 function ThreeHero() {
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none", opacity: 0.9 }}>
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 0,
+        pointerEvents: "none",
+        opacity: 0.9,
+      }}
+    >
       <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
         <Suspense fallback={null}>
           <ambientLight intensity={0.7} />
@@ -276,8 +396,15 @@ const linkCardStyle = {
   background: "rgba(255,255,255,0.02)",
 };
 
-const subtleText = { fontSize: "12px", color: "#888", marginTop: "2px" };
-const arrowStyle = { color: "#ff3b30" };
+const subtleText = {
+  fontSize: "12px",
+  color: "#888",
+  marginTop: "2px",
+};
+
+const arrowStyle = {
+  color: "#ff3b30",
+};
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
@@ -314,19 +441,46 @@ export default function App() {
     clearSaved,
   } = useHistory();
 
-  const analyzeRisks = useCallback(async (hits) => {
-    const initialLoading = {};
+  const analyzeRisks = useCallback(async (hits, options = {}) => {
+    const limit = options.limit ?? 1;
+    const targetHits = hits.slice(0, limit);
 
-    hits.forEach((r) => {
-      const key = r.id || r.title;
-      initialLoading[key] = true;
+    if (targetHits.length === 0) return;
+
+    const cachedRiskById = {};
+    const loadingState = {};
+    const recallsToAnalyze = [];
+
+    targetHits.forEach((recall) => {
+      const key = recall.id || recall.title;
+      const cached = readCachedRisk(recall);
+
+      if (cached) {
+        cachedRiskById[key] = cached;
+      } else {
+        loadingState[key] = true;
+        recallsToAnalyze.push(recall);
+      }
     });
 
-    setRiskLoadingById(initialLoading);
-    setRiskById({});
+    if (Object.keys(cachedRiskById).length > 0) {
+      setRiskById((prev) => ({
+        ...prev,
+        ...cachedRiskById,
+      }));
+    }
+
+    if (Object.keys(loadingState).length > 0) {
+      setRiskLoadingById((prev) => ({
+        ...prev,
+        ...loadingState,
+      }));
+    }
+
+    if (recallsToAnalyze.length === 0) return;
 
     const settled = await Promise.allSettled(
-      hits.slice(0, 10).map(async (recall) => {
+      recallsToAnalyze.map(async (recall) => {
         const key = recall.id || recall.title;
 
         const res = await fetch("/api/analyze-risk", {
@@ -337,15 +491,26 @@ export default function App() {
           body: JSON.stringify({ recall }),
         });
 
-        console.log("Risk API status:", res.status);
+        let payload = null;
 
-        if (!res.ok) {
-          throw new Error(`Risk API failed: ${res.status}`);
+        try {
+          payload = await res.json();
+        } catch {
+          payload = null;
         }
 
-        const risk = await res.json();
+        console.log("Risk API status:", res.status);
+        console.log("Risk API payload:", payload);
 
-        console.log("Risk response:", risk);
+        if (!res.ok) {
+          return [key, buildUnavailableRisk(recall)];
+        }
+
+        const risk = payload || buildUnavailableRisk(recall);
+
+        if (!risk?.aiStatus?.startsWith("fallback")) {
+          writeCachedRisk(recall, risk);
+        }
 
         return [key, risk];
       })
@@ -354,101 +519,146 @@ export default function App() {
     const nextRisk = {};
     const nextLoading = {};
 
-    settled.forEach((item) => {
+    settled.forEach((item, index) => {
+      const recall = recallsToAnalyze[index];
+      const key = recall.id || recall.title;
+
+      nextLoading[key] = false;
+
       if (item.status === "fulfilled") {
-        const [key, risk] = item.value;
-        nextRisk[key] = risk;
-        nextLoading[key] = false;
+        const [fulfilledKey, risk] = item.value;
+        nextRisk[fulfilledKey] = risk;
+      } else {
+        nextRisk[key] = buildUnavailableRisk(recall);
       }
     });
 
-    hits.forEach((r) => {
-      const key = r.id || r.title;
-      if (!(key in nextLoading)) {
-        nextLoading[key] = false;
-      }
-    });
+    setRiskById((prev) => ({
+      ...prev,
+      ...nextRisk,
+    }));
 
-    setRiskById(nextRisk);
-    setRiskLoadingById(nextLoading);
+    setRiskLoadingById((prev) => ({
+      ...prev,
+      ...nextLoading,
+    }));
   }, []);
 
-  const searchRecalls = useCallback(async (overrideQuery, overrideCategory) => {
-    const searchTerm = overrideQuery ?? query;
-    const cat = overrideCategory ?? category;
+  const searchRecalls = useCallback(
+    async (overrideQuery, overrideCategory) => {
+      const searchTerm = overrideQuery ?? query;
+      const cat = overrideCategory ?? category;
 
-    if (cat !== "vehicle" && !searchTerm.trim()) return;
+      if (cat !== "vehicle" && !searchTerm.trim()) return;
 
-    if (cat === "vehicle" && (!vehicleYear.trim() || !vehicleMake.trim() || !vehicleModel.trim())) {
-      setError("Enter vehicle year, make, and model.");
-      return;
-    }
+      if (
+        cat === "vehicle" &&
+        (!vehicleYear.trim() || !vehicleMake.trim() || !vehicleModel.trim())
+      ) {
+        setError("Enter vehicle year, make, and model.");
+        return;
+      }
 
-    setLoading(true);
-    setError("");
-    setSearched(true);
-    setResults([]);
+      setLoading(true);
+      setError("");
+      setSearched(true);
+      setResults([]);
+      setRiskById({});
+      setRiskLoadingById({});
 
-    try {
-      let hits = [];
+      try {
+        let hits = [];
 
-      if (["food", "drug", "device"].includes(cat)) {
-        const res = await fetch(`${endpoints[cat]}?search=${encodeURIComponent(searchTerm.trim())}&limit=10`);
+        if (["food", "drug", "device"].includes(cat)) {
+          const res = await fetch(
+            `${endpoints[cat]}?search=${encodeURIComponent(
+              searchTerm.trim()
+            )}&limit=10`
+          );
 
-        if (!res.ok) {
-          if (res.status === 404) {
-            hits = [];
+          if (!res.ok) {
+            if (res.status === 404) {
+              hits = [];
+            } else {
+              setError(`Search failed (${res.status}). Please try again.`);
+              return;
+            }
           } else {
-            setError(`Search failed (${res.status}). Please try again.`);
+            const data = await res.json();
+            hits = (data.results ?? []).map((r, i) =>
+              normalizeFdaRecall(r, cat, i)
+            );
+          }
+        }
+
+        if (cat === "consumer") {
+          const res = await fetch(
+            `https://www.saferproducts.gov/RestWebServices/Recall?format=json&ProductName=${encodeURIComponent(
+              searchTerm.trim()
+            )}`
+          );
+
+          if (!res.ok) {
+            setError(`CPSC search failed (${res.status}). Please try again.`);
             return;
           }
-        } else {
+
           const data = await res.json();
-          hits = (data.results ?? []).map((r, i) => normalizeFdaRecall(r, cat, i));
+          hits = Array.isArray(data)
+            ? data.slice(0, 10).map(normalizeCpscRecall)
+            : [];
         }
-      }
 
-      if (cat === "consumer") {
-        const res = await fetch(
-          `https://www.saferproducts.gov/RestWebServices/Recall?format=json&ProductName=${encodeURIComponent(searchTerm.trim())}`
+        if (cat === "vehicle") {
+          const res = await fetch(
+            `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(
+              vehicleMake.trim()
+            )}&model=${encodeURIComponent(
+              vehicleModel.trim()
+            )}&modelYear=${encodeURIComponent(vehicleYear.trim())}`
+          );
+
+          if (!res.ok) {
+            setError(`NHTSA search failed (${res.status}). Please try again.`);
+            return;
+          }
+
+          const data = await res.json();
+          hits = (data.results ?? data.Results ?? [])
+            .slice(0, 20)
+            .map(normalizeNhtsaRecall);
+        }
+
+        setResults(hits);
+        analyzeRisks(hits, { limit: 1 });
+
+        logSearch(
+          cat === "vehicle"
+            ? `${vehicleYear} ${vehicleMake} ${vehicleModel}`
+            : searchTerm,
+          cat,
+          hits.length
         );
-
-        if (!res.ok) {
-          setError(`CPSC search failed (${res.status}). Please try again.`);
-          return;
-        }
-
-        const data = await res.json();
-        hits = Array.isArray(data) ? data.slice(0, 10).map(normalizeCpscRecall) : [];
-      }
-
-      if (cat === "vehicle") {
-        const res = await fetch(
-          `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(vehicleMake.trim())}&model=${encodeURIComponent(vehicleModel.trim())}&modelYear=${encodeURIComponent(vehicleYear.trim())}`
+      } catch (err) {
+        setError(
+          err.name === "TypeError"
+            ? "Network error — check your connection and try again."
+            : "Something went wrong. Please try again."
         );
-
-        if (!res.ok) {
-          setError(`NHTSA search failed (${res.status}). Please try again.`);
-          return;
-        }
-
-        const data = await res.json();
-        hits = (data.results ?? data.Results ?? []).slice(0, 20).map(normalizeNhtsaRecall);
+      } finally {
+        setLoading(false);
       }
-
-      setResults(hits);
-      analyzeRisks(hits);
-      logSearch(cat === "vehicle" ? `${vehicleYear} ${vehicleMake} ${vehicleModel}` : searchTerm, cat, hits.length);
-    } catch (err) {
-      setError(
-        err.name === "TypeError"
-          ? "Network error — check your connection and try again."
-          : "Something went wrong. Please try again."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [query, category, vehicleYear, vehicleMake, vehicleModel, logSearch, analyzeRisks]);
+    },
+    [
+      query,
+      category,
+      vehicleYear,
+      vehicleMake,
+      vehicleModel,
+      logSearch,
+      analyzeRisks,
+    ]
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -461,7 +671,7 @@ export default function App() {
       setCategory(cat);
       searchRecalls(sharedQuery, cat);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleScanResult = (productName) => {
@@ -478,17 +688,31 @@ export default function App() {
   };
 
   const buildShareUrl = (recall) => {
-    const params = new URLSearchParams({ q: query || recall.title || "", cat: category });
+    const params = new URLSearchParams({
+      q: query || recall.title || "",
+      cat: category,
+    });
+
     return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
   };
 
   const shareRecall = async (recall) => {
     const url = buildShareUrl(recall);
-    const text = `⚠️ Recall Alert\n\nProduct: ${shortText(recall.title, 180)}\n\nReason: ${shortText(recall.reason, 180)}\n\nCheck it on RecallRadar:\n${url}`;
+    const text = `⚠️ Recall Alert\n\nProduct: ${shortText(
+      recall.title,
+      180
+    )}\n\nReason: ${shortText(
+      recall.reason,
+      180
+    )}\n\nCheck it on RecallRadar:\n${url}`;
 
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Recall Alert", text, url });
+        await navigator.share({
+          title: "Recall Alert",
+          text,
+          url,
+        });
       } else {
         await navigator.clipboard.writeText(text);
         setCopied(recall.title || "recall");
@@ -526,18 +750,23 @@ export default function App() {
     }
 
     try {
-      const res = await fetch("https://api.sheetbest.com/sheets/a5c4ecd4-7684-48f7-9cd0-8ccf090c0b7a", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          product: selectedProduct,
-          category,
-          search_query: query,
-          source: "premium_modal",
-          timestamp: new Date().toISOString(),
-        }),
-      });
+      const res = await fetch(
+        "https://api.sheetbest.com/sheets/a5c4ecd4-7684-48f7-9cd0-8ccf090c0b7a",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: email.trim(),
+            product: selectedProduct,
+            category,
+            search_query: query,
+            source: "premium_modal",
+            timestamp: new Date().toISOString(),
+          }),
+        }
+      );
 
       if (!res.ok) {
         alert(`Could not save email (${res.status}). Please try again.`);
@@ -550,90 +779,399 @@ export default function App() {
     }
   };
 
-  const totalActivity = searchHistory.length + alertHistory.length + savedSearches.length;
+  const totalActivity =
+    searchHistory.length + alertHistory.length + savedSearches.length;
 
   return (
-    <div style={{ minHeight: "100vh", background: "radial-gradient(circle at top, #351010 0%, #0b0b0b 38%, #050505 100%)", color: "#fff", fontFamily: "Inter, system-ui, sans-serif", padding: "2rem", position: "relative", overflow: "hidden" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background:
+          "radial-gradient(circle at top, #351010 0%, #0b0b0b 38%, #050505 100%)",
+        color: "#fff",
+        fontFamily: "Inter, system-ui, sans-serif",
+        padding: "clamp(1rem, 3vw, 2rem)",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
       <ThreeHero />
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,5,5,0.08), rgba(5,5,5,0.78) 58%, #050505 100%)", zIndex: 1, pointerEvents: "none" }} />
 
-      <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} style={{ maxWidth: "1080px", margin: "auto", position: "relative", zIndex: 2 }}>
-        <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "58px" }}>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(to bottom, rgba(5,5,5,0.08), rgba(5,5,5,0.78) 58%, #050505 100%)",
+          zIndex: 1,
+          pointerEvents: "none",
+        }}
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        style={{
+          maxWidth: "1080px",
+          margin: "auto",
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        <nav
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "58px",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}
+        >
           <strong style={{ fontSize: "1.1rem" }}>RecallRadar</strong>
+
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <button onClick={() => setShowHistory(true)} title="Your activity" style={{ position: "relative", padding: "10px 14px", borderRadius: "999px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "0.88rem" }}>
+            <button
+              onClick={() => setShowHistory(true)}
+              title="Your activity"
+              style={{
+                position: "relative",
+                padding: "10px 14px",
+                borderRadius: "999px",
+                background: "rgba(255,255,255,0.07)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                color: "#fff",
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: "0.88rem",
+              }}
+            >
               🕐 History
               {totalActivity > 0 && (
-                <span style={{ position: "absolute", top: "-4px", right: "-4px", background: "#ff3b30", borderRadius: "999px", width: "16px", height: "16px", fontSize: "0.62rem", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "-4px",
+                    right: "-4px",
+                    background: "#ff3b30",
+                    borderRadius: "999px",
+                    width: "16px",
+                    height: "16px",
+                    fontSize: "0.62rem",
+                    fontWeight: 900,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   {Math.min(totalActivity, 99)}
                 </span>
               )}
             </button>
 
-            <button onClick={() => openPremiumModal("early access monitoring")} style={{ padding: "10px 14px", borderRadius: "999px", background: "#fff", color: "#000", border: "none", fontWeight: 800, cursor: "pointer" }}>
+            <button
+              onClick={() => openPremiumModal("early access monitoring")}
+              style={{
+                padding: "10px 14px",
+                borderRadius: "999px",
+                background: "#fff",
+                color: "#000",
+                border: "none",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
               Join early access
             </button>
           </div>
         </nav>
 
         <section style={{ textAlign: "center", minHeight: "520px" }}>
-          <p style={{ display: "inline-block", border: "1px solid rgba(255,255,255,0.14)", borderRadius: "999px", padding: "7px 13px", color: "#ddd", fontSize: "0.85rem", background: "rgba(255,255,255,0.06)", backdropFilter: "blur(12px)" }}>
+          <p
+            style={{
+              display: "inline-block",
+              border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: "999px",
+              padding: "7px 13px",
+              color: "#ddd",
+              fontSize: "0.85rem",
+              background: "rgba(255,255,255,0.06)",
+              backdropFilter: "blur(12px)",
+            }}
+          >
             Consumer safety intelligence for everyday products
           </p>
-          <h1 style={{ fontSize: "clamp(3.4rem, 9vw, 7rem)", lineHeight: 0.92, margin: "210px 0 0", letterSpacing: "-0.085em", textShadow: "0 30px 100px rgba(255,59,48,0.22)" }}>
-            Know before<br />it hurts you.
+
+          <h1
+            style={{
+              fontSize: "clamp(3.2rem, 9vw, 7rem)",
+              lineHeight: 0.92,
+              margin: "210px 0 0",
+              letterSpacing: "-0.085em",
+              textShadow: "0 30px 100px rgba(255,59,48,0.22)",
+            }}
+          >
+            Know before
+            <br />
+            it hurts you.
           </h1>
-          <p style={{ color: "#c8c8c8", fontSize: "1.25rem", maxWidth: "760px", margin: "24px auto 0", lineHeight: 1.65 }}>
-            RecallRadar helps you search food, drugs, medical devices, consumer products, and vehicle recalls — then monitors the products you care about before a recall becomes your problem.
+
+          <p
+            style={{
+              color: "#c8c8c8",
+              fontSize: "clamp(1rem, 2.8vw, 1.25rem)",
+              maxWidth: "760px",
+              margin: "24px auto 0",
+              lineHeight: 1.65,
+            }}
+          >
+            RecallRadar helps you search food, drugs, medical devices, consumer
+            products, and vehicle recalls — then monitors the products you care
+            about before a recall becomes your problem.
           </p>
         </section>
 
-        <section style={{ marginTop: "-70px", background: "rgba(17,17,17,0.84)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "28px", padding: "24px", boxShadow: "0 35px 100px rgba(0,0,0,0.5)", backdropFilter: "blur(14px)" }}>
-          <div style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap" }}>
+        <section
+          style={{
+            marginTop: "-70px",
+            background: "rgba(17,17,17,0.84)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "28px",
+            padding: "clamp(16px, 3vw, 24px)",
+            boxShadow: "0 35px 100px rgba(0,0,0,0.5)",
+            backdropFilter: "blur(14px)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
             {categories.map((c) => (
-              <button key={c} onClick={() => handleCategoryChange(c)} style={{ padding: "9px 16px", borderRadius: "999px", border: category === c ? "1px solid #fff" : "1px solid rgba(255,255,255,0.12)", background: category === c ? "#fff" : "transparent", color: category === c ? "#000" : "#aaa", cursor: "pointer", fontWeight: 800 }}>
+              <button
+                key={c}
+                onClick={() => handleCategoryChange(c)}
+                style={{
+                  padding: "9px 16px",
+                  borderRadius: "999px",
+                  border:
+                    category === c
+                      ? "1px solid #fff"
+                      : "1px solid rgba(255,255,255,0.12)",
+                  background: category === c ? "#fff" : "transparent",
+                  color: category === c ? "#000" : "#aaa",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                }}
+              >
                 {categoryLabels[c]}
               </button>
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: "10px", marginTop: "24px" }}>
-            <button onClick={() => setShowScanner(true)} title="Scan a barcode" style={{ padding: "17px 18px", borderRadius: "16px", background: "rgba(255,59,48,0.12)", border: "1px solid rgba(255,59,48,0.3)", color: "#ff3b30", cursor: "pointer", fontSize: "1.3rem", flexShrink: 0 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "auto minmax(0, 1fr) auto",
+              gap: "10px",
+              marginTop: "24px",
+              alignItems: "stretch",
+            }}
+          >
+            <button
+              onClick={() => setShowScanner(true)}
+              title="Scan a barcode"
+              style={{
+                padding: "17px 18px",
+                borderRadius: "16px",
+                background: "rgba(255,59,48,0.12)",
+                border: "1px solid rgba(255,59,48,0.3)",
+                color: "#ff3b30",
+                cursor: "pointer",
+                fontSize: "1.3rem",
+              }}
+            >
               📷
             </button>
 
-            <input value={query} onChange={(e) => { setQuery(e.target.value); setScannedLabel(""); }} onKeyDown={(e) => e.key === "Enter" && searchRecalls()} placeholder={category === "vehicle" ? "Optional keyword, e.g. airbag, brake…" : "Search product, brand, ingredient…"} style={{ flex: 1, padding: "17px", borderRadius: "16px", border: scannedLabel ? "1px solid rgba(255,59,48,0.5)" : "1px solid rgba(255,255,255,0.12)", background: "#080808", color: "#fff", outline: "none", fontSize: "1rem" }} />
+            <input
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setScannedLabel("");
+              }}
+              onKeyDown={(e) => e.key === "Enter" && searchRecalls()}
+              placeholder={
+                category === "vehicle"
+                  ? "Optional keyword, e.g. airbag, brake…"
+                  : "Search product, brand, ingredient…"
+              }
+              style={{
+                width: "100%",
+                minWidth: 0,
+                padding: "17px",
+                borderRadius: "16px",
+                border: scannedLabel
+                  ? "1px solid rgba(255,59,48,0.5)"
+                  : "1px solid rgba(255,255,255,0.12)",
+                background: "#080808",
+                color: "#fff",
+                outline: "none",
+                fontSize: "1rem",
+                boxSizing: "border-box",
+              }}
+            />
 
-            <button onClick={() => searchRecalls()} disabled={loading} style={{ padding: "17px 26px", borderRadius: "16px", background: "#fff", color: "#000", border: "none", cursor: loading ? "not-allowed" : "pointer", fontWeight: 900, opacity: loading ? 0.7 : 1, flexShrink: 0 }}>
+            <button
+              onClick={() => searchRecalls()}
+              disabled={loading}
+              style={{
+                padding: "17px 26px",
+                borderRadius: "16px",
+                background: "#fff",
+                color: "#000",
+                border: "none",
+                cursor: loading ? "not-allowed" : "pointer",
+                fontWeight: 900,
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
               {loading ? "Searching…" : "Search"}
             </button>
           </div>
 
           {category === "vehicle" && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginTop: "14px" }}>
-              <input value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)} placeholder="Year, e.g. 2021" style={{ padding: "14px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.12)", background: "#080808", color: "#fff", outline: "none" }} />
-              <input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} placeholder="Make, e.g. Toyota" style={{ padding: "14px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.12)", background: "#080808", color: "#fff", outline: "none" }} />
-              <input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} onKeyDown={(e) => e.key === "Enter" && searchRecalls()} placeholder="Model, e.g. Camry" style={{ padding: "14px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.12)", background: "#080808", color: "#fff", outline: "none" }} />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: "10px",
+                marginTop: "14px",
+              }}
+            >
+              <input
+                value={vehicleYear}
+                onChange={(e) => setVehicleYear(e.target.value)}
+                placeholder="Year, e.g. 2021"
+                style={{
+                  padding: "14px",
+                  borderRadius: "14px",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "#080808",
+                  color: "#fff",
+                  outline: "none",
+                }}
+              />
+
+              <input
+                value={vehicleMake}
+                onChange={(e) => setVehicleMake(e.target.value)}
+                placeholder="Make, e.g. Toyota"
+                style={{
+                  padding: "14px",
+                  borderRadius: "14px",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "#080808",
+                  color: "#fff",
+                  outline: "none",
+                }}
+              />
+
+              <input
+                value={vehicleModel}
+                onChange={(e) => setVehicleModel(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchRecalls()}
+                placeholder="Model, e.g. Camry"
+                style={{
+                  padding: "14px",
+                  borderRadius: "14px",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "#080808",
+                  color: "#fff",
+                  outline: "none",
+                }}
+              />
             </div>
           )}
 
           {scannedLabel && (
-            <div style={{ marginTop: "10px", display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(255,59,48,0.12)", border: "1px solid rgba(255,59,48,0.25)", borderRadius: "999px", padding: "6px 12px", fontSize: "0.82rem", color: "#ffb4ae" }}>
+            <div
+              style={{
+                marginTop: "10px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "rgba(255,59,48,0.12)",
+                border: "1px solid rgba(255,59,48,0.25)",
+                borderRadius: "999px",
+                padding: "6px 12px",
+                fontSize: "0.82rem",
+                color: "#ffb4ae",
+              }}
+            >
               📷 Scanned: <strong>{shortText(scannedLabel, 60)}</strong>
-              <button onClick={() => setScannedLabel("")} style={{ background: "none", border: "none", color: "#ff8a80", cursor: "pointer", padding: 0 }}>✕</button>
+              <button
+                onClick={() => setScannedLabel("")}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#ff8a80",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                ✕
+              </button>
             </div>
           )}
 
           {savedSearches.length > 0 && (
-            <div style={{ marginTop: "14px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ color: "#555", fontSize: "0.82rem" }}>⭐ Saved:</span>
+            <div
+              style={{
+                marginTop: "14px",
+                display: "flex",
+                gap: "8px",
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <span style={{ color: "#555", fontSize: "0.82rem" }}>
+                ⭐ Saved:
+              </span>
+
               {savedSearches.slice(0, 4).map((s) => (
-                <button key={s.id} onClick={() => handleRunSearch(s.query, s.category)} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#bbb", borderRadius: "999px", padding: "5px 12px", cursor: "pointer", fontSize: "0.8rem" }}>
+                <button
+                  key={s.id}
+                  onClick={() => handleRunSearch(s.query, s.category)}
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "#bbb",
+                    borderRadius: "999px",
+                    padding: "5px 12px",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                  }}
+                >
                   {s.query}
                 </button>
               ))}
+
               {savedSearches.length > 4 && (
-                <button onClick={() => setShowHistory(true)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: "0.78rem" }}>
+                <button
+                  onClick={() => setShowHistory(true)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#555",
+                    cursor: "pointer",
+                    fontSize: "0.78rem",
+                  }}
+                >
                   +{savedSearches.length - 4} more
                 </button>
               )}
@@ -644,44 +1182,269 @@ export default function App() {
             🔒 Join early access to monitor products and get future safety alerts.
           </p>
 
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "14px", color: "#777" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+              marginTop: "14px",
+              color: "#777",
+            }}
+          >
             <span>Try:</span>
-            {["milk", "chicken", "Tylenol", "syringe", "toddler stool", "air fryer"].map((item) => (
-              <button key={item} onClick={() => setQuery(item)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", color: "#bbb", borderRadius: "999px", padding: "5px 11px", cursor: "pointer" }}>
-                {item}
-              </button>
-            ))}
-            <button onClick={() => { setCategory("vehicle"); setVehicleYear("2021"); setVehicleMake("Toyota"); setVehicleModel("Camry"); }} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", color: "#bbb", borderRadius: "999px", padding: "5px 11px", cursor: "pointer" }}>
+
+            {["milk", "chicken", "Tylenol", "syringe", "toddler stool", "air fryer"].map(
+              (item) => (
+                <button
+                  key={item}
+                  onClick={() => setQuery(item)}
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    color: "#bbb",
+                    borderRadius: "999px",
+                    padding: "5px 11px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {item}
+                </button>
+              )
+            )}
+
+            <button
+              onClick={() => {
+                setCategory("vehicle");
+                setVehicleYear("2021");
+                setVehicleMake("Toyota");
+                setVehicleModel("Camry");
+              }}
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "#bbb",
+                borderRadius: "999px",
+                padding: "5px 11px",
+                cursor: "pointer",
+              }}
+            >
               2021 Toyota Camry
             </button>
           </div>
         </section>
 
-        {error && <p style={{ color: "#ff8a80", marginTop: "20px", textAlign: "center" }}>{error}</p>}
-        {copied && <p style={{ color: "#a7f3d0", marginTop: "20px", textAlign: "center", fontWeight: 800 }}>Link copied to clipboard.</p>}
+        <section
+          style={{
+            marginTop: "18px",
+            padding: "18px",
+            borderRadius: "20px",
+            background: "rgba(255,255,255,0.035)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "14px",
+            }}
+          >
+            <div>
+              <strong style={{ display: "block", marginBottom: "6px" }}>
+                ✅ Official-source first
+              </strong>
+              <p style={{ color: "#888", lineHeight: 1.55, margin: 0 }}>
+                RecallRadar starts with public recall records from FDA, CPSC,
+                and NHTSA sources where available.
+              </p>
+            </div>
+
+            <div>
+              <strong style={{ display: "block", marginBottom: "6px" }}>
+                🧠 AI-assisted interpretation
+              </strong>
+              <p style={{ color: "#888", lineHeight: 1.55, margin: 0 }}>
+                AI analysis translates official recall language into clearer
+                safety signals when available.
+              </p>
+            </div>
+
+            <div>
+              <strong style={{ display: "block", marginBottom: "6px" }}>
+                🔎 Always verify
+              </strong>
+              <p style={{ color: "#888", lineHeight: 1.55, margin: 0 }}>
+                Official recall notices remain the source of truth for affected
+                products, remedies, and final instructions.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {loading && (
+          <section
+            style={{
+              marginTop: "28px",
+              padding: "24px",
+              borderRadius: "22px",
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: "1.5rem", marginBottom: "8px" }}>🔎</div>
+            <strong>Searching official recall data…</strong>
+            <p style={{ color: "#888", marginBottom: 0 }}>
+              Checking recall records and preparing safety guidance.
+            </p>
+          </section>
+        )}
+
+        {error && (
+          <p style={{ color: "#ff8a80", marginTop: "20px", textAlign: "center" }}>
+            {error}
+          </p>
+        )}
+
+        {copied && (
+          <p
+            style={{
+              color: "#a7f3d0",
+              marginTop: "20px",
+              textAlign: "center",
+              fontWeight: 800,
+            }}
+          >
+            Link copied to clipboard.
+          </p>
+        )}
 
         {!loading && searched && results.length === 0 && (
-          <section style={{ marginTop: "30px", padding: "24px", borderRadius: "20px", background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(10px)" }}>
-            <p style={{ color: "#ffb4ae", fontSize: "12px", marginBottom: "10px", fontWeight: 900 }}>BROADER SAFETY SIGNALS</p>
-            <h3 style={{ marginBottom: "10px" }}>{category === "vehicle" ? "No vehicle recall match found" : category === "consumer" ? "No CPSC match found" : "No FDA match — expanding your search"}</h3>
+          <section
+            style={{
+              marginTop: "30px",
+              padding: "28px",
+              borderRadius: "24px",
+              background:
+                "linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025))",
+              border: "1px solid rgba(255,255,255,0.09)",
+              backdropFilter: "blur(10px)",
+            }}
+          >
+            <p
+              style={{
+                color: "#ffb4ae",
+                fontSize: "12px",
+                marginBottom: "10px",
+                fontWeight: 900,
+              }}
+            >
+              NO DIRECT MATCH FOUND
+            </p>
+
+            <h3 style={{ marginBottom: "10px", fontSize: "1.45rem" }}>
+              {category === "vehicle"
+                ? "No vehicle recall match found"
+                : category === "consumer"
+                  ? "No CPSC recall match found"
+                  : "No FDA recall match found"}
+            </h3>
+
             <p style={{ color: "#aaa", lineHeight: 1.6 }}>
               {category === "vehicle"
                 ? "Vehicle recalls can depend on exact trim, production date, and VIN. Check official NHTSA and manufacturer sources if you are unsure."
                 : category === "consumer"
-                  ? "Consumer product risks often appear in recalls, news reports, and manufacturer notices before centralized databases catch up."
-                  : "This product may still have safety risks. Check official consumer-product, news, and manufacturer sources below."}
+                  ? "Consumer product risks may appear in manufacturer notices, public reports, and news before they are easy to find in one place."
+                  : "No official match appeared for this search. If you are concerned, check the broader safety sources below."}
             </p>
-            <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+
+            <div
+              style={{
+                marginTop: "20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "14px",
+              }}
+            >
               {category === "vehicle" ? (
                 <>
-                  <a href={`https://www.nhtsa.gov/recalls?keyword=${encodeURIComponent(`${vehicleYear} ${vehicleMake} ${vehicleModel}`)}`} target="_blank" rel="noreferrer" style={linkCardStyle}><div><strong>NHTSA recall lookup</strong><p style={subtleText}>Official vehicle recall database</p></div><span style={arrowStyle}>→</span></a>
-                  <a href={`https://www.google.com/search?q=${encodeURIComponent(`${vehicleYear} ${vehicleMake} ${vehicleModel} recall`)}`} target="_blank" rel="noreferrer" style={linkCardStyle}><div><strong>Manufacturer recall notices</strong><p style={subtleText}>Automaker and dealer recall information</p></div><span style={arrowStyle}>→</span></a>
+                  <a
+                    href={`https://www.nhtsa.gov/recalls?keyword=${encodeURIComponent(
+                      `${vehicleYear} ${vehicleMake} ${vehicleModel}`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={linkCardStyle}
+                  >
+                    <div>
+                      <strong>NHTSA recall lookup</strong>
+                      <p style={subtleText}>Official vehicle recall database</p>
+                    </div>
+                    <span style={arrowStyle}>→</span>
+                  </a>
+
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(
+                      `${vehicleYear} ${vehicleMake} ${vehicleModel} recall`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={linkCardStyle}
+                  >
+                    <div>
+                      <strong>Manufacturer recall notices</strong>
+                      <p style={subtleText}>Automaker and dealer recall information</p>
+                    </div>
+                    <span style={arrowStyle}>→</span>
+                  </a>
                 </>
               ) : (
                 <>
-                  <a href={`https://www.cpsc.gov/Recalls?search=${encodeURIComponent(query)}`} target="_blank" rel="noreferrer" style={linkCardStyle}><div><strong>Consumer Product Safety</strong><p style={subtleText}>Official CPSC recall database</p></div><span style={arrowStyle}>→</span></a>
-                  <a href={`https://www.google.com/search?q=${encodeURIComponent(query + " recall news")}&tbm=nws`} target="_blank" rel="noreferrer" style={linkCardStyle}><div><strong>Latest recall news</strong><p style={subtleText}>Recent reports and public safety coverage</p></div><span style={arrowStyle}>→</span></a>
-                  <a href={`https://www.google.com/search?q=${encodeURIComponent(query + " manufacturer recall")}`} target="_blank" rel="noreferrer" style={linkCardStyle}><div><strong>Manufacturer notices</strong><p style={subtleText}>Company-issued recall and return information</p></div><span style={arrowStyle}>→</span></a>
+                  <a
+                    href={`https://www.cpsc.gov/Recalls?search=${encodeURIComponent(
+                      query
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={linkCardStyle}
+                  >
+                    <div>
+                      <strong>Consumer Product Safety</strong>
+                      <p style={subtleText}>Official CPSC recall database</p>
+                    </div>
+                    <span style={arrowStyle}>→</span>
+                  </a>
+
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(
+                      query + " recall news"
+                    )}&tbm=nws`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={linkCardStyle}
+                  >
+                    <div>
+                      <strong>Latest recall news</strong>
+                      <p style={subtleText}>Recent reports and public safety coverage</p>
+                    </div>
+                    <span style={arrowStyle}>→</span>
+                  </a>
+
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(
+                      query + " manufacturer recall"
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={linkCardStyle}
+                  >
+                    <div>
+                      <strong>Manufacturer notices</strong>
+                      <p style={subtleText}>Company-issued recall and return information</p>
+                    </div>
+                    <span style={arrowStyle}>→</span>
+                  </a>
                 </>
               )}
             </div>
@@ -692,25 +1455,132 @@ export default function App() {
           {results.map((r, i) => {
             const cardId = r.id || `${r.source}-${i}`;
             const risk = riskById[cardId];
-            const severity = risk?.riskLevel || getRecallSeverity(r);
+            const isRiskLoading = riskLoadingById[cardId];
+
+            const isFallbackRisk =
+              risk?.aiStatus?.startsWith("fallback") ||
+              risk?.aiStatus === "frontend_ai_unavailable";
+
+            const severity =
+              risk && !isFallbackRisk ? risk.riskLevel : getRecallSeverity(r);
+
             const guidance = getRecallGuidance(r);
             const isExpanded = expandedWhy === cardId;
             const savedThis = isSaved(query, category);
 
             return (
-              <motion.div key={cardId} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.045 }} whileHover={{ scale: 1.015, boxShadow: "0 24px 80px rgba(255,59,48,0.12)" }} onViewportEnter={() => logAlert(r, category)} style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.025))", border: "1px solid rgba(255,255,255,0.09)", padding: "24px", marginBottom: "16px", borderRadius: "20px", position: "relative", overflow: "hidden" }}>
-                <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at top right, rgba(255,59,48,0.16), transparent 32%)", pointerEvents: "none" }} />
+              <motion.div
+                key={cardId}
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.045 }}
+                whileHover={{
+                  scale: 1.01,
+                  boxShadow: "0 24px 80px rgba(255,59,48,0.12)",
+                }}
+                onViewportEnter={() => logAlert(r, category)}
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.025))",
+                  border: "1px solid rgba(255,255,255,0.09)",
+                  padding: "clamp(18px, 3vw, 24px)",
+                  marginBottom: "18px",
+                  borderRadius: "24px",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background:
+                      "radial-gradient(circle at top right, rgba(255,59,48,0.16), transparent 32%)",
+                    pointerEvents: "none",
+                  }}
+                />
+
                 <div style={{ position: "relative" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                    <div style={{ display: "inline-flex", background: severity === "HIGH" ? "rgba(255,59,48,0.25)" : severity === "MEDIUM" ? "rgba(255,149,0,0.25)" : "rgba(255,255,255,0.1)", color: severity === "HIGH" ? "#ff3b30" : severity === "MEDIUM" ? "#ff9500" : "#aaa", padding: "6px 11px", borderRadius: "999px", fontSize: "12px", fontWeight: 900 }}>
-                      ⚠️ {severity} RISK
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginBottom: "14px",
+                      gap: "12px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "8px",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          background:
+                            severity === "HIGH"
+                              ? "rgba(255,59,48,0.25)"
+                              : severity === "MEDIUM"
+                                ? "rgba(255,149,0,0.25)"
+                                : "rgba(255,255,255,0.1)",
+                          color:
+                            severity === "HIGH"
+                              ? "#ff3b30"
+                              : severity === "MEDIUM"
+                                ? "#ff9500"
+                                : "#aaa",
+                          padding: "6px 11px",
+                          borderRadius: "999px",
+                          fontSize: "12px",
+                          fontWeight: 900,
+                        }}
+                      >
+                        ⚠️ {severity} RISK
+                      </div>
+
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          padding: "6px 10px",
+                          borderRadius: "999px",
+                          background: "rgba(255,255,255,0.07)",
+                          border: "1px solid rgba(255,255,255,0.09)",
+                          color: "#bbb",
+                          fontSize: "12px",
+                          fontWeight: 800,
+                        }}
+                      >
+                        ✅ Official source: {r.source}
+                      </div>
                     </div>
-                    <button onClick={() => toggleSaved(query, category)} title={savedThis ? "Remove from saved" : "Save this search"} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.2rem", opacity: savedThis ? 1 : 0.3, transition: "opacity 0.15s" }}>
+
+                    <button
+                      onClick={() => toggleSaved(query, category)}
+                      title={savedThis ? "Remove from saved" : "Save this search"}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "1.2rem",
+                        opacity: savedThis ? 1 : 0.35,
+                        transition: "opacity 0.15s",
+                      }}
+                    >
                       ⭐
                     </button>
                   </div>
 
-                  <h3 style={{ fontSize: "1.35rem", lineHeight: 1.35, margin: "0 0 12px" }}>
+                  <h3
+                    style={{
+                      fontSize: "clamp(1.15rem, 3vw, 1.35rem)",
+                      lineHeight: 1.35,
+                      margin: "0 0 12px",
+                    }}
+                  >
                     {highlight(shortText(r.title || "Unknown product", 180), query)}
                   </h3>
 
@@ -719,52 +1589,227 @@ export default function App() {
                     {highlight(shortText(r.reason || "No data", 180), query)}
                   </p>
 
-                  <RiskIntelligence
-  risk={riskById[cardId]}
-  loading={riskLoadingById[cardId]}
-  source={r.source}
-  date={r.date}
-  sourceContext={riskById[cardId]?.sourceContext}
-/>
+                  {isRiskLoading && (
+                    <RiskIntelligence
+                      risk={risk}
+                      loading={isRiskLoading}
+                      source={r.source}
+                      date={r.date}
+                      sourceContext={risk?.sourceContext}
+                    />
+                  )}
 
-                  <p style={{ color: "#999", fontSize: "0.92rem" }}>{guidance.label}</p>
+                  {risk && !isFallbackRisk && (
+                    <RiskIntelligence
+                      risk={risk}
+                      loading={false}
+                      source={r.source}
+                      date={r.date}
+                      sourceContext={risk.sourceContext}
+                    />
+                  )}
 
-                  <div style={{ marginTop: "18px", padding: "18px", borderRadius: "18px", background: "rgba(0,0,0,0.28)", border: "1px solid rgba(255,255,255,0.08)", textAlign: "left" }}>
-                    <strong style={{ display: "block", marginBottom: "12px" }}>🧭 What should I do?</strong>
+                  {risk && isFallbackRisk && (
+                    <div
+                      style={{
+                        marginTop: "14px",
+                        padding: "13px 15px",
+                        borderRadius: "14px",
+                        background: "rgba(255,255,255,0.045)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "#aaa",
+                        fontSize: "0.9rem",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      🧠 AI risk analysis is temporarily unavailable right now.
+                      Official recall details are still shown below.
+                    </div>
+                  )}
+
+                  {!risk && !isRiskLoading && (
+                    <button
+                      onClick={() => analyzeRisks([r], { limit: 1 })}
+                      style={{
+                        marginTop: "14px",
+                        padding: "11px 14px",
+                        borderRadius: "13px",
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        color: "#ddd",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                      }}
+                    >
+                      🧠 Analyze risk
+                    </button>
+                  )}
+
+                  <div
+                    style={{
+                      marginTop: "18px",
+                      padding: "18px",
+                      borderRadius: "18px",
+                      background: "rgba(0,0,0,0.28)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "12px",
+                        flexWrap: "wrap",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      <strong>🧭 What should I do?</strong>
+                      <span style={{ color: "#888", fontSize: "0.85rem" }}>
+                        {guidance.label}
+                      </span>
+                    </div>
+
                     <div style={{ display: "grid", gap: "10px" }}>
                       {guidance.actions.map((action, index) => (
-                        <motion.div key={action} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.05 }} style={{ padding: "10px 12px", borderRadius: "12px", background: "rgba(255,255,255,0.045)", color: "#ddd", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <motion.div
+                          key={action}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          style={{
+                            padding: "10px 12px",
+                            borderRadius: "12px",
+                            background: "rgba(255,255,255,0.045)",
+                            color: "#ddd",
+                            border: "1px solid rgba(255,255,255,0.06)",
+                          }}
+                        >
                           {action}
                         </motion.div>
                       ))}
                     </div>
 
-                    <button onClick={() => setExpandedWhy(isExpanded ? null : cardId)} style={{ marginTop: "14px", padding: "10px 12px", borderRadius: "12px", background: "transparent", border: "1px solid rgba(255,255,255,0.14)", color: "#ddd", cursor: "pointer", fontWeight: 800 }}>
+                    <button
+                      onClick={() => setExpandedWhy(isExpanded ? null : cardId)}
+                      style={{
+                        marginTop: "14px",
+                        padding: "10px 12px",
+                        borderRadius: "12px",
+                        background: "transparent",
+                        border: "1px solid rgba(255,255,255,0.14)",
+                        color: "#ddd",
+                        cursor: "pointer",
+                        fontWeight: 800,
+                      }}
+                    >
                       {isExpanded ? "Hide explanation" : "Why is this dangerous?"}
                     </button>
 
                     <AnimatePresence>
                       {isExpanded && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden" }}>
-                          <p style={{ color: "#aaa", lineHeight: 1.6, marginTop: "12px" }}>
-                            This guidance is based on the recall reason: <strong style={{ color: "#fff" }}>{r.reason || "No reason provided."}</strong>
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          style={{ overflow: "hidden" }}
+                        >
+                          <p
+                            style={{
+                              color: "#aaa",
+                              lineHeight: 1.6,
+                              marginTop: "12px",
+                            }}
+                          >
+                            This guidance is based on the recall reason:{" "}
+                            <strong style={{ color: "#fff" }}>
+                              {r.reason || "No reason provided."}
+                            </strong>
                           </p>
-                          <p style={{ color: "#888", lineHeight: 1.6 }}>For return, repair, refund, or remedy details, check the official recall source or contact the recalling company.</p>
-                          <a href={r.url || `https://www.google.com/search?q=${encodeURIComponent(`${r.company || ""} recall contact return refund`)}`} target="_blank" rel="noreferrer" style={{ color: "#ffb4ae", fontWeight: 800 }}>Open official recall/source →</a>
+
+                          <p style={{ color: "#888", lineHeight: 1.6 }}>
+                            For return, repair, refund, or remedy details, check the
+                            official recall source or contact the recalling company.
+                          </p>
+
+                          <a
+                            href={
+                              r.url ||
+                              `https://www.google.com/search?q=${encodeURIComponent(
+                                `${r.company || ""} recall contact return refund`
+                              )}`
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: "#ffb4ae", fontWeight: 800 }}
+                          >
+                            Open official recall/source →
+                          </a>
                         </motion.div>
                       )}
                     </AnimatePresence>
                   </div>
 
-                  <p style={{ color: "#888", marginBottom: 4, marginTop: "16px" }}><strong style={{ color: "#ccc" }}>Source:</strong> {r.source}</p>
-                  <p style={{ color: "#888", marginBottom: 4 }}><strong style={{ color: "#ccc" }}>Company:</strong> {r.company || "Unknown"}</p>
-                  <p style={{ color: "#666", marginTop: 0 }}><strong>Date:</strong> {r.date || "N/A"}</p>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                      gap: "8px",
+                      marginTop: "16px",
+                      color: "#888",
+                      fontSize: "0.92rem",
+                    }}
+                  >
+                    <div>
+                      <strong style={{ color: "#ccc" }}>Source:</strong> {r.source}
+                    </div>
 
-                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
-                    <button onClick={() => openPremiumModal(r.title)} style={{ padding: "13px 17px", borderRadius: "13px", background: "#ff3b30", border: "none", color: "#fff", fontWeight: 900, cursor: "pointer" }}>
+                    <div>
+                      <strong style={{ color: "#ccc" }}>Company:</strong>{" "}
+                      {r.company || "Unknown"}
+                    </div>
+
+                    <div>
+                      <strong style={{ color: "#ccc" }}>Date:</strong>{" "}
+                      {r.date || "N/A"}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      flexWrap: "wrap",
+                      marginTop: "16px",
+                    }}
+                  >
+                    <button
+                      onClick={() => openPremiumModal(r.title)}
+                      style={{
+                        padding: "13px 17px",
+                        borderRadius: "13px",
+                        background: "#ff3b30",
+                        border: "none",
+                        color: "#fff",
+                        fontWeight: 900,
+                        cursor: "pointer",
+                      }}
+                    >
                       🛡 Protect me from this
                     </button>
-                    <button onClick={() => shareRecall(r)} style={{ padding: "13px 17px", borderRadius: "13px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#ddd", fontWeight: 800, cursor: "pointer" }}>
+
+                    <button
+                      onClick={() => shareRecall(r)}
+                      style={{
+                        padding: "13px 17px",
+                        borderRadius: "13px",
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        color: "#ddd",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                      }}
+                    >
                       🔗 Share
                     </button>
                   </div>
@@ -774,8 +1819,16 @@ export default function App() {
           })}
         </section>
 
-        <footer style={{ color: "#555", textAlign: "center", margin: "50px 0 20px", fontSize: "0.85rem" }}>
-          RecallRadar is an early prototype. Always verify recall details with official sources.
+        <footer
+          style={{
+            color: "#555",
+            textAlign: "center",
+            margin: "50px 0 20px",
+            fontSize: "0.85rem",
+          }}
+        >
+          RecallRadar is an early prototype. Always verify recall details with
+          official sources.
         </footer>
       </motion.div>
 
@@ -797,28 +1850,164 @@ export default function App() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showScanner && <BarcodeScanner onResult={handleScanResult} onClose={() => setShowScanner(false)} />}
+        {showScanner && (
+          <BarcodeScanner
+            onResult={handleScanResult}
+            onClose={() => setShowScanner(false)}
+          />
+        )}
       </AnimatePresence>
 
       <AnimatePresence>
         {selectedProduct && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closePremiumModal} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 100 }}>
-            <motion.div initial={{ opacity: 0, scale: 0.92, y: 18 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92, y: 18 }} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "520px", background: "linear-gradient(135deg, rgba(26,26,26,0.98), rgba(12,12,12,0.98))", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "24px", padding: "28px", boxShadow: "0 40px 120px rgba(0,0,0,0.7)" }}>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closePremiumModal}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.72)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px",
+              zIndex: 100,
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 18 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 18 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: "520px",
+                background:
+                  "linear-gradient(135deg, rgba(26,26,26,0.98), rgba(12,12,12,0.98))",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: "24px",
+                padding: "28px",
+                boxShadow: "0 40px 120px rgba(0,0,0,0.7)",
+              }}
+            >
               {!joined ? (
                 <>
-                  <p style={{ color: "#ff8a80", fontWeight: 900, letterSpacing: "0.08em", fontSize: "0.78rem", margin: 0 }}>PREMIUM MONITORING</p>
-                  <h2 style={{ margin: "12px 0", fontSize: "2rem" }}>Never miss a dangerous recall.</h2>
-                  <p style={{ color: "#aaa", lineHeight: 1.6 }}>Join early access and we'll notify you when monitoring opens for products like:</p>
-                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "14px", color: "#fff", margin: "16px 0" }}>{shortText(selectedProduct, 100)}</div>
-                  <input value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && joinWaitlist()} placeholder="Enter your email" type="email" style={{ width: "100%", boxSizing: "border-box", padding: "15px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.12)", background: "#070707", color: "#fff", outline: "none", fontSize: "1rem" }} />
-                  <button onClick={joinWaitlist} style={{ width: "100%", marginTop: "12px", padding: "15px", borderRadius: "14px", background: "#ff3b30", color: "#fff", border: "none", fontWeight: 900, cursor: "pointer", fontSize: "1rem" }}>Join early access</button>
-                  <button onClick={closePremiumModal} style={{ width: "100%", marginTop: "10px", padding: "12px", borderRadius: "14px", background: "transparent", color: "#888", border: "none", cursor: "pointer" }}>Maybe later</button>
+                  <p
+                    style={{
+                      color: "#ff8a80",
+                      fontWeight: 900,
+                      letterSpacing: "0.08em",
+                      fontSize: "0.78rem",
+                      margin: 0,
+                    }}
+                  >
+                    PREMIUM MONITORING
+                  </p>
+
+                  <h2 style={{ margin: "12px 0", fontSize: "2rem" }}>
+                    Never miss a dangerous recall.
+                  </h2>
+
+                  <p style={{ color: "#aaa", lineHeight: 1.6 }}>
+                    Join early access and we'll notify you when monitoring opens
+                    for products like:
+                  </p>
+
+                  <div
+                    style={{
+                      background: "rgba(255,255,255,0.06)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: "16px",
+                      padding: "14px",
+                      color: "#fff",
+                      margin: "16px 0",
+                    }}
+                  >
+                    {shortText(selectedProduct, 100)}
+                  </div>
+
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && joinWaitlist()}
+                    placeholder="Enter your email"
+                    type="email"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "15px",
+                      borderRadius: "14px",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "#070707",
+                      color: "#fff",
+                      outline: "none",
+                      fontSize: "1rem",
+                    }}
+                  />
+
+                  <button
+                    onClick={joinWaitlist}
+                    style={{
+                      width: "100%",
+                      marginTop: "12px",
+                      padding: "15px",
+                      borderRadius: "14px",
+                      background: "#ff3b30",
+                      color: "#fff",
+                      border: "none",
+                      fontWeight: 900,
+                      cursor: "pointer",
+                      fontSize: "1rem",
+                    }}
+                  >
+                    Join early access
+                  </button>
+
+                  <button
+                    onClick={closePremiumModal}
+                    style={{
+                      width: "100%",
+                      marginTop: "10px",
+                      padding: "12px",
+                      borderRadius: "14px",
+                      background: "transparent",
+                      color: "#888",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Maybe later
+                  </button>
                 </>
               ) : (
                 <>
-                  <h2 style={{ margin: "0 0 12px", fontSize: "2rem" }}>You're on the list.</h2>
-                  <p style={{ color: "#aaa", lineHeight: 1.6 }}>Your email has been saved. We'll notify you when premium monitoring opens.</p>
-                  <button onClick={closePremiumModal} style={{ width: "100%", marginTop: "12px", padding: "15px", borderRadius: "14px", background: "#fff", color: "#000", border: "none", fontWeight: 900, cursor: "pointer" }}>Continue exploring</button>
+                  <h2 style={{ margin: "0 0 12px", fontSize: "2rem" }}>
+                    You're on the list.
+                  </h2>
+
+                  <p style={{ color: "#aaa", lineHeight: 1.6 }}>
+                    Your email has been saved. We'll notify you when premium
+                    monitoring opens.
+                  </p>
+
+                  <button
+                    onClick={closePremiumModal}
+                    style={{
+                      width: "100%",
+                      marginTop: "12px",
+                      padding: "15px",
+                      borderRadius: "14px",
+                      background: "#fff",
+                      color: "#000",
+                      border: "none",
+                      fontWeight: 900,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Continue exploring
+                  </button>
                 </>
               )}
             </motion.div>
