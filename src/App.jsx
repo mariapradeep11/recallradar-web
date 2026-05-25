@@ -321,10 +321,10 @@ export default function App() {
       {/* Idle 3D hero (visible before search) */}
       {!searched && <IdleHero />}
 
-      <div style={{ position: "relative", zIndex: 2, maxWidth: "980px", margin: "0 auto", padding: "clamp(16px, 3vw, 28px)" }}>
+      <div style={{ position: "relative", zIndex: 2, maxWidth: "980px", margin: "0 auto", padding: "16px clamp(16px, 3vw, 28px)" }}>
 
         {/* ── NAV ── */}
-        <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: searched ? "28px" : "48px", gap: "12px", flexWrap: "wrap" }}>
+        <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: searched ? "28px" : "16px", gap: "12px", flexWrap: "wrap" }}>
           <strong style={{ fontSize: "1rem", letterSpacing: "-0.02em", color: "rgba(255,255,255,0.85)" }}>RecallRadar</strong>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <button onClick={() => setShowHistory(true)} style={{ position: "relative", padding: "8px 14px", borderRadius: "999px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)", cursor: "pointer", fontWeight: 600, fontSize: "0.8rem" }}>
@@ -339,7 +339,7 @@ export default function App() {
 
         {/* ── HERO (idle state) ── */}
         {!searched && (
-          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} style={{ textAlign: "center", minHeight: "420px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} style={{ textAlign: "center", minHeight: "300px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
             <p style={{ display: "inline-block", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "999px", padding: "6px 14px", color: "rgba(255,255,255,0.5)", fontSize: "0.78rem", background: "rgba(255,255,255,0.04)", backdropFilter: "blur(8px)", margin: "0 auto 20px" }}>
               Consumer safety intelligence
             </p>
@@ -353,10 +353,24 @@ export default function App() {
         )}
 
         {/* ── PHOTO HERO (after search) ── */}
-        <PhotoHero query={query} category={category} hasResults={results.length > 0} isSearching={loading} />
+        {searched && (
+          <PhotoHero
+            query={query}
+            category={category}
+            hasResults={results.length > 0}
+            isSearching={loading}
+          />
+        )}
 
         {/* ── SEARCH PANEL ── */}
-        <section style={glass.searchPanel}>
+        <section
+        style={{
+          ...glass.searchPanel,
+          position: "relative",
+          zIndex: 5,
+          marginTop: searched ? "-180px" : "0",
+        }}
+         >
           <div style={{ display: "flex", justifyContent: "center", gap: "6px", flexWrap: "wrap", marginBottom: "16px" }}>
             {categories.map((c) => (
               <button key={c} onClick={() => handleCategoryChange(c)} style={glass.catBtn(category === c)}>

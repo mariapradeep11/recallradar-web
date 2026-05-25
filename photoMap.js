@@ -23,6 +23,74 @@ const PHOTO_BASE = "/photos/";
 // The matcher checks if the search query CONTAINS the keyword (case-insensitive)
 // More specific keywords should come first (e.g. "chicken breast" before "chicken")
 
+
+const departmentKeywords = {
+  food_meat: [
+    "meat",
+    "beef",
+    "steak",
+    "burger",
+    "ham",
+    "pork",
+  ],
+
+  food_poultry: [
+    "chicken",
+    "poultry",
+    "turkey",
+    "nuggets",
+    "wings",
+  ],
+
+  food_dairy: [
+    "milk",
+    "cheese",
+    "yogurt",
+    "cream",
+    "butter",
+  ],
+
+  food_drinks: [
+    "coke",
+    "pepsi",
+    "drink",
+    "juice",
+    "soda",
+    "water",
+  ],
+
+  food_sauces: [
+    "ketchup",
+    "sauce",
+    "mustard",
+    "mayo",
+    "condiment",
+  ],
+
+  medicine_pain_relief: [
+    "tylenol",
+    "ibuprofen",
+    "advil",
+    "pain",
+    "acetaminophen",
+  ],
+
+  consumer_kitchen: [
+    "air fryer",
+    "blender",
+    "toaster",
+    "microwave",
+  ],
+
+  consumer_baby: [
+    "stroller",
+    "crib",
+    "baby",
+    "toddler",
+    "kids",
+  ],
+};
+
 const keywordPhotos = {
   // Food
   "chicken breast": "chicken-raw.jpg",

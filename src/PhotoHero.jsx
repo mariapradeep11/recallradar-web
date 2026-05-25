@@ -1,83 +1,67 @@
-import { Suspense, useRef, useMemo, useState, useEffect, useCallback } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
-import * as THREE from "three";
-import { resolvePhoto, resolveAllPhotos, preloadPhoto, categoryGlow } from "./photoMap.js";
+import { resolveAllPhotos, preloadPhoto, categoryGlow } from "./photoMap.js";
 
-/* ═══════════════════════════════════════════════════════════════════════════════
-   3D SCAN OVERLAY — floating rings + particles on transparent canvas
-   ═══════════════════════════════════════════════════════════════════════════════ */
+function ScanRings({ color = "#ff3b30" }) {
+  const group = useRef();
 
-function ScanRing({ radius = 1.8, color = "#ff3b30", speed = 0.5, yBase = 0 }) {
-  const ref = useRef();
-  useFrame((s) => {
-    if (!ref.current) return;
-    ref.current.rotation.x = Math.PI * 0.5;
-    ref.current.position.y = yBase + Math.sin(s.clock.elapsedTime * speed) * 0.8;
-    ref.current.rotation.z = s.clock.elapsedTime * 0.2;
-  });
-  return (
-    <mesh ref={ref}>
-      <torusGeometry args={[radius, 0.005, 8, 80]} />
-      <meshBasicMaterial color={color} transparent opacity={0.3} />
-    </mesh>
-  );
-}
-
-function ScanParticles({ count = 50, radius = 2.2, color = "#ff6b60" }) {
-  const ref = useRef();
-  const positions = useMemo(() => {
-    const arr = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      const r = radius * (0.6 + Math.random() * 0.4);
-      arr[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
-      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      arr[i * 3 + 2] = r * Math.cos(phi);
-    }
-    return arr;
-  }, [count, radius]);
-
-  useFrame((s) => {
-    if (!ref.current) return;
-    ref.current.rotation.y = s.clock.elapsedTime * 0.06;
+  useFrame((state) => {
+    if (!group.current) return;
+    group.current.rotation.z = state.clock.elapsedTime * 0.18;
+    group.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.3) * 0.25;
   });
 
   return (
-    <points ref={ref}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" count={count} array={positions} itemSize={3} />
-      </bufferGeometry>
-      <pointsMaterial color={color} size={0.018} transparent opacity={0.4} sizeAttenuation />
-    </points>
+    <group ref={group}>
+      {[1.05, 1.45, 1.85].map((radius, i) => (
+        <mesh key={radius} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[radius, 0.006, 8, 128]} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={0.42 - i * 0.09}
+          />
+        </mesh>
+      ))}
+
+      <points>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={80}
+            itemSize={3}
+            array={
+              new Float32Array(
+                Array.from({ length: 240 }, () => (Math.random() - 0.5) * 4)
+              )
+            }
+          />
+        </bufferGeometry>
+        <pointsMaterial color={color} size={0.025} transparent opacity={0.45} />
+      </points>
+    </group>
   );
 }
 
-function ScanOverlay({ glowColor = "#ff3b30" }) {
+function ScanCanvas({ color }) {
   return (
-    <Canvas camera={{ position: [0, 0, 5], fov: 50 }} style={{ background: "transparent", position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3 }}>
+    <Canvas
+      camera={{ position: [0, 0, 5], fov: 45 }}
+      style={{
+        position: "absolute",
+        inset: 0,
+        background: "transparent",
+        pointerEvents: "none",
+      }}
+    >
       <Suspense fallback={null}>
-        <ScanRing radius={1.6} color={glowColor} speed={0.5} yBase={0} />
-        <ScanRing radius={1.2} color={glowColor} speed={-0.35} yBase={0.15} />
-        <ScanRing radius={2.0} color={glowColor} speed={0.25} yBase={-0.1} />
-        <ScanParticles count={50} radius={2.4} color={glowColor} />
-        <Stars radius={30} depth={15} count={150} factor={1.2} saturation={0} fade />
+        <ScanRings color={color} />
+        <Stars radius={40} depth={20} count={180} factor={1.2} fade />
       </Suspense>
     </Canvas>
   );
 }
-
-/* ═══════════════════════════════════════════════════════════════════════════════
-   CINEMATIC PHOTO HERO
-   
-   Flow:
-   1. Before search → invisible (height 0)
-   2. Search triggered → screen goes black → photo fades in FULLSCREEN
-   3. "Scanning" label pulses, 3D rings orbit on top
-   4. After 2.5s reveal OR when results arrive → smoothly shrinks
-   5. On scroll → next photo crossfades in (if multiple available)
-   ═══════════════════════════════════════════════════════════════════════════════ */
 
 export default function PhotoHero({
   query = "",
@@ -85,336 +69,207 @@ export default function PhotoHero({
   hasResults = false,
   isSearching = false,
 }) {
-  const [phase, setPhase] = useState("idle");       // idle | reveal | compact
-  const [currentPhoto, setCurrentPhoto] = useState(null);
-  const [nextPhoto, setNextPhoto] = useState(null);
+  const [photo, setPhoto] = useState(null);
   const [photoIndex, setPhotoIndex] = useState(0);
-  const [allPhotos, setAllPhotos] = useState([]);
-  const [crossfade, setCrossfade] = useState(false);
-  const containerRef = useRef(null);
-  const prevQueryRef = useRef("");
-  const revealTimerRef = useRef(null);
+  const [scrollY, setScrollY] = useState(0);
 
   const glow = categoryGlow[category] || categoryGlow.food;
 
-  // ── When search starts: go fullscreen black → reveal photo ────────────
-  useEffect(() => {
-    if (!isSearching) return;
-    if (query === prevQueryRef.current && phase !== "idle") return;
+  const photos = useMemo(() => {
+    return resolveAllPhotos(query || category, category);
+  }, [query, category]);
 
-    prevQueryRef.current = query;
-    setPhase("reveal");
+  useEffect(() => {
+    const first = photos[0];
+    if (!first) return;
+
+    preloadPhoto(first).then((src) => {
+      if (src) setPhoto(src);
+    });
+
     setPhotoIndex(0);
-    setCrossfade(false);
+  }, [photos]);
 
-    // Resolve all available photos for this query
-    const photos = resolveAllPhotos(query, category);
-    setAllPhotos(photos);
-
-    // Preload first photo
-    if (photos.length > 0) {
-      preloadPhoto(photos[0]).then((src) => {
-        setCurrentPhoto(src);
-      });
-    }
-
-    // Clear any existing timer
-    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
-
-  }, [isSearching, query, category]);
-
-  // ── When results arrive: wait a beat, then shrink to compact ──────────
   useEffect(() => {
-    if (!hasResults || phase !== "reveal") return;
+    if (photos.length <= 1) return;
 
-    // Hold the fullscreen reveal for at least 2 seconds so the user sees it
-    revealTimerRef.current = setTimeout(() => {
-      setPhase("compact");
-    }, 2000);
+    const onScroll = () => {
+      const y = window.scrollY;
+      setScrollY(y);
 
-    return () => {
-      if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
-    };
-  }, [hasResults, phase]);
-
-  // ── Reset when going back to idle ─────────────────────────────────────
-  useEffect(() => {
-    if (!isSearching && !hasResults) {
-      setPhase("idle");
-      setCurrentPhoto(null);
-      setNextPhoto(null);
-      setPhotoIndex(0);
-    }
-  }, [isSearching, hasResults]);
-
-  // ── Scroll-driven image rotation (compact mode) ───────────────────────
-  useEffect(() => {
-    if (phase !== "compact" || allPhotos.length <= 1) return;
-
-    let lastScrollY = window.scrollY;
-    let scrollAccum = 0;
-    const threshold = 400; // pixels of scroll before next image
-
-    const handleScroll = () => {
-      const delta = Math.abs(window.scrollY - lastScrollY);
-      lastScrollY = window.scrollY;
-      scrollAccum += delta;
-
-      if (scrollAccum >= threshold) {
-        scrollAccum = 0;
-        setPhotoIndex((prev) => {
-          const next = (prev + 1) % allPhotos.length;
-
-          // Crossfade to next photo
-          preloadPhoto(allPhotos[next]).then((src) => {
-            if (src) {
-              setNextPhoto(src);
-              setCrossfade(true);
-              setTimeout(() => {
-                setCurrentPhoto(src);
-                setNextPhoto(null);
-                setCrossfade(false);
-              }, 800);
-            }
-          });
-
-          return next;
+      const nextIndex = Math.floor(y / 520) % photos.length;
+      if (nextIndex !== photoIndex) {
+        preloadPhoto(photos[nextIndex]).then((src) => {
+          if (src) {
+            setPhoto(src);
+            setPhotoIndex(nextIndex);
+          }
         });
       }
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [phase, allPhotos]);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [photos, photoIndex]);
 
-  // ── Cleanup ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    return () => {
-      if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
-    };
-  }, []);
-
-  // ── Don't render if idle ──────────────────────────────────────────────
-  if (phase === "idle") return null;
-
-  const isFullscreen = phase === "reveal";
-  const isCompact = phase === "compact";
+  if (!query && !isSearching && !hasResults) return null;
 
   return (
-    <>
-      {/* Fullscreen black backdrop for cinematic reveal */}
-      {isFullscreen && (
+    <section
+      style={{
+        position: "relative",
+        minHeight: hasResults ? "420px" : "520px",
+        marginTop: "-20px",
+        marginBottom: hasResults ? "-280px" : "-180px",
+        borderRadius: "0 0 42px 42px",
+        overflow: "hidden",
+        isolation: "isolate",
+      }}
+    >
+      {photo && (
         <div
           style={{
-            position: "fixed",
+            position: "absolute",
             inset: 0,
-            background: "#000",
-            zIndex: 50,
-            animation: "fadeIn 0.3s ease forwards",
+            backgroundImage: `url(${photo})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            transform: `scale(1.08) translateY(${scrollY * -0.035}px)`,
+            transition: "background-image 0.8s ease, transform 0.2s linear",
+            zIndex: 1,
           }}
         />
       )}
 
-      {/* Main hero container */}
       <div
-        ref={containerRef}
         style={{
-          position: isFullscreen ? "fixed" : "relative",
-          inset: isFullscreen ? 0 : undefined,
-          width: "100%",
-          height: isFullscreen ? "100vh" : "220px",
-          zIndex: isFullscreen ? 51 : 1,
-          overflow: "hidden",
-          borderRadius: isCompact ? "22px" : "0",
-          marginBottom: isCompact ? "20px" : "0",
-          transition: isCompact
-            ? "height 0.8s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.8s ease"
-            : "none",
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(90deg, rgba(0,0,0,0.94) 0%, rgba(0,0,0,0.72) 34%, rgba(0,0,0,0.2) 64%, rgba(0,0,0,0.88) 100%)",
+          zIndex: 2,
+        }}
+      />
+
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(circle at 68% 44%, rgba(255,255,255,0.12), transparent 14%), radial-gradient(circle at 72% 45%, rgba(255,59,48,0.22), transparent 28%)",
+          zIndex: 3,
+          mixBlendMode: "screen",
+        }}
+      />
+
+      <div
+        style={{
+          position: "absolute",
+          right: "8%",
+          top: "23%",
+          width: "420px",
+          height: "420px",
+          zIndex: 4,
+          opacity: 0.95,
         }}
       >
-        {/* Current photo */}
-        {currentPhoto && (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              backgroundImage: `url(${currentPhoto})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              animation: isFullscreen ? "photoReveal 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards" : "none",
-              transform: isCompact ? "scale(1.05)" : "scale(1.15)",
-              transition: "transform 12s ease-out",
-              zIndex: 1,
-            }}
-          />
-        )}
-
-        {/* Crossfade: next photo fading in on top */}
-        {nextPhoto && crossfade && (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              backgroundImage: `url(${nextPhoto})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              animation: "fadeIn 0.8s ease forwards",
-              transform: "scale(1.05)",
-              zIndex: 2,
-            }}
-          />
-        )}
-
-        {/* Dark cinematic vignette */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: isFullscreen
-              ? `linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.02) 30%, rgba(0,0,0,0.4) 70%, rgba(0,0,0,0.85) 100%),
-                 radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%)`
-              : `linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 100%)`,
-            zIndex: 3,
-            pointerEvents: "none",
-          }}
-        />
-
-        {/* Category ambient glow */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: glow.bg,
-            zIndex: 4,
-            pointerEvents: "none",
-            opacity: 0.5,
-          }}
-        />
-
-        {/* 3D Scan overlay — only during reveal */}
-        {isFullscreen && <ScanOverlay glowColor={glow.primary} />}
-
-        {/* Scanning status — fullscreen mode */}
-        {isFullscreen && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "15%",
-              left: "50%",
-              transform: "translateX(-50%)",
-              zIndex: 10,
-              textAlign: "center",
-              animation: "fadeInUp 0.8s ease 0.5s both",
-            }}
-          >
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "10px",
-                background: "rgba(0,0,0,0.5)",
-                backdropFilter: "blur(16px)",
-                WebkitBackdropFilter: "blur(16px)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: "999px",
-                padding: "10px 22px",
-              }}
-            >
-              <div style={{
-                width: "8px", height: "8px", borderRadius: "50%",
-                background: glow.primary,
-                boxShadow: `0 0 12px ${glow.primary}`,
-                animation: "pulse 1.2s ease-in-out infinite",
-              }} />
-              <span style={{
-                color: "rgba(255,255,255,0.7)",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                letterSpacing: "0.04em",
-              }}>
-                Scanning safety database
-              </span>
-            </div>
-
-            {/* Product label */}
-            <p style={{
-              color: "rgba(255,255,255,0.35)",
-              fontSize: "0.78rem",
-              marginTop: "14px",
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}>
-              {query}
-            </p>
-          </div>
-        )}
-
-        {/* Compact mode: small label */}
-        {isCompact && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "14px",
-              left: "18px",
-              zIndex: 10,
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <div style={{
-              width: "7px", height: "7px", borderRadius: "50%",
-              background: glow.primary,
-              boxShadow: `0 0 8px ${glow.primary}`,
-            }} />
-            <span style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.78rem", fontWeight: 600 }}>
-              {query}
-            </span>
-            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: "0.68rem" }}>
-              {category === "vehicle" ? "NHTSA" : category === "consumer" ? "CPSC" : "FDA"}
-            </span>
-            {allPhotos.length > 1 && (
-              <span style={{ color: "rgba(255,255,255,0.15)", fontSize: "0.65rem" }}>
-                {photoIndex + 1}/{allPhotos.length}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Scroll hint in compact mode */}
-        {isCompact && allPhotos.length > 1 && (
-          <div style={{
-            position: "absolute",
-            bottom: "14px",
-            right: "18px",
-            zIndex: 10,
-            color: "rgba(255,255,255,0.2)",
-            fontSize: "0.65rem",
-          }}>
-            scroll for more
-          </div>
-        )}
+        <ScanCanvas color={glow.primary} />
       </div>
 
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-        @keyframes photoReveal {
-          0%   { opacity: 0; transform: scale(1.25); filter: brightness(0.3); }
-          40%  { opacity: 1; }
-          100% { opacity: 1; transform: scale(1.15); filter: brightness(0.85); }
-        }
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateX(-50%) translateY(16px); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50%      { opacity: 0.4; transform: scale(1.6); }
-        }
-      `}</style>
-    </>
+      <div
+        style={{
+          position: "relative",
+          zIndex: 6,
+          maxWidth: "1120px",
+          margin: "0 auto",
+          padding: "36px 28px 90px",
+          display: "grid",
+          gridTemplateColumns: "1.05fr 0.95fr",
+          gap: "40px",
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <p
+            style={{
+              color: glow.primary,
+              letterSpacing: "0.22em",
+              fontSize: "0.72rem",
+              fontWeight: 800,
+              marginBottom: "24px",
+            }}
+          >
+            KNOW BEFORE IT HURTS YOU
+          </p>
+
+          <h1
+            style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontSize: "clamp(2.7rem, 5.4vw, 5.4rem)",
+              lineHeight: 0.94,
+              letterSpacing: "-0.06em",
+              fontWeight: 400,
+              margin: 0,
+              maxWidth: "690px",
+            }}
+          >
+            Real-time recall intelligence.
+            <br />
+            For everything you bring home.
+          </h1>
+
+          <p
+            style={{
+              marginTop: "28px",
+              color: "rgba(255,255,255,0.58)",
+              maxWidth: "430px",
+              fontSize: "1rem",
+              lineHeight: 1.65,
+            }}
+          >
+            Scan a barcode or search a product to see if it has been recalled,
+            why it matters, and what to do next.
+          </p>
+        </div>
+
+        <div
+          style={{
+            justifySelf: "end",
+            alignSelf: "center",
+            width: "320px",
+            display: "grid",
+            gap: "18px",
+            color: "rgba(255,255,255,0.75)",
+            fontSize: "0.78rem",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          <div>
+            <strong style={{ color: "#fff" }}>Product detected</strong>
+            <p style={{ margin: "6px 0 0", color: "rgba(255,255,255,0.45)" }}>
+              93% confidence
+            </p>
+          </div>
+
+          <div
+            style={{
+              height: "1px",
+              background:
+                "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)",
+            }}
+          />
+
+          <div>
+            <strong style={{ color: "#fff" }}>
+              {query || "Product scan"}
+            </strong>
+            <p style={{ margin: "6px 0 0", color: glow.primary }}>
+              Safety database match
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
