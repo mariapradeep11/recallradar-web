@@ -2,9 +2,14 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import RiskIntelligence from "./RiskIntelligence";
+import BarcodeScanner from "./BarcodeScanner";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Float, OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
+import PhotoHero from "./PhotoHero.jsx";
+import FloatingPhotos from "./FloatingPhotos.jsx";
+
+
 
 type Category = "food" | "drug" | "device" | "consumer";
 type Severity = "LOW" | "MEDIUM" | "HIGH";
@@ -27,6 +32,38 @@ const categoryLabels: Record<Category, string> = {
   drug: "Medicine",
   device: "Medical Devices",
   consumer: "Consumer Products",
+};
+
+const productImages: Record<string, string[]> = {
+  chicken: [
+    "/images/chicken/chicken-01.jpg",
+    "/images/chicken/chicken-02.jpg",
+    "/images/chicken/chicken-03.jpg",
+    "/images/chicken/chicken-04.jpg",
+    "/images/chicken/chicken-05.jpg",
+    "/images/chicken/chicken-06.jpg",
+    "/images/chicken/chicken-07.jpg",
+  ],
+  milk: [
+    "/images/milk/milk-01.jpg",
+    "/images/milk/milk-02.jpg",
+    "/images/milk/milk-03.jpg",
+    "/images/milk/milk-04.jpg",
+  ],
+};
+
+const getProductImage = (description = "", index = 0) => {
+  const text = description.toLowerCase();
+
+  if (text.includes("chicken")) {
+    return productImages.chicken[index % productImages.chicken.length];
+  }
+
+  if (text.includes("milk")) {
+    return productImages.milk[index % productImages.milk.length];
+  }
+
+  return "/images/chicken/chicken-01.jpg";
 };
 
 const linkCardStyle: CSSProperties = {
@@ -233,6 +270,7 @@ export default function App() {
   const [joined, setJoined] = useState(false);
   const [copied, setCopied] = useState("");
   const [expandedWhy, setExpandedWhy] = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
 
   const searchRecalls = async (overrideQuery?: string) => {
     const searchTerm = overrideQuery || query;
@@ -375,7 +413,26 @@ ${url}`;
         overflow: "hidden",
       }}
     >
-      <ThreeHero />
+      <style>
+        {`
+          @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.65; }
+            50% { transform: scale(1.08); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.65; }
+          }
+        `}
+      </style>
+
+      {searched && (
+        <PhotoHero query={query} category={category} hasResults={results.length > 0} isSearching={loading} />
+      )}
+      {!searched && <ThreeHero />}
+
+      {searched && (
+        <PhotoHero query={query} category={category} hasResults={results.length > 0} isSearching={loading} />
+      )}
+      {!searched && <ThreeHero />}
+      <FloatingPhotos query={query} category={category} visible={searched && results.length > 0} />
 
       <div
         style={{
@@ -463,6 +520,7 @@ ${url}`;
           </p>
         </section>
 
+<PhotoHero query={query} category={category} hasResults={results.length > 0} isSearching={loading} />
         <section
           style={{
             marginTop: "-70px",
@@ -500,6 +558,23 @@ ${url}`;
           </div>
 
           <div style={{ display: "flex", gap: "10px", marginTop: "24px" }}>
+            <button
+              type="button"
+              onClick={() => setShowScanner(true)}
+              title="Scan barcode"
+              style={{
+                width: "54px",
+                borderRadius: "14px",
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(255,59,48,0.14)",
+                color: "#fff",
+                fontSize: "1.2rem",
+                cursor: "pointer",
+              }}
+            >
+              📷
+            </button>
+
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -682,6 +757,81 @@ ${url}`;
                 <div style={{ position: "relative" }}>
                   <div
                     style={{
+                      position: "relative",
+                      width: "100%",
+                      height: "210px",
+                      borderRadius: "20px",
+                      overflow: "hidden",
+                      marginBottom: "20px",
+                      background: "#111",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    <img
+                      src={getProductImage(r.product_description, i)}
+                      alt={r.product_description || "Product image"}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        filter: "brightness(0.9) saturate(1.05)",
+                        transform: "scale(1.02)",
+                      }}
+                    />
+
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background:
+                          "linear-gradient(to top, rgba(0,0,0,0.48), rgba(0,0,0,0.02))",
+                      }}
+                    />
+
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "120px",
+                          height: "120px",
+                          borderRadius: "999px",
+                          border: "1px solid rgba(255,255,255,0.18)",
+                          boxShadow: "0 0 24px rgba(255,255,255,0.16)",
+                          animation: "pulse 3s infinite",
+                        }}
+                      />
+                    </div>
+
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "14px",
+                        left: "14px",
+                        background: "rgba(0,0,0,0.5)",
+                        backdropFilter: "blur(12px)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        padding: "9px 12px",
+                        borderRadius: "14px",
+                        color: "#fff",
+                        fontWeight: 800,
+                        fontSize: "0.75rem",
+                        letterSpacing: "0.03em",
+                      }}
+                    >
+                      SCAN DETECTED
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
                       display: "inline-flex",
                       background:
                         severity === "HIGH"
@@ -719,18 +869,14 @@ ${url}`;
                   <RiskIntelligence
                     risk={{
                       riskLevel: severity,
-                      why: [
-                        r.reason_for_recall || "Recall hazard detected",
-                      ],
+                      why: [r.reason_for_recall || "Recall hazard detected"],
                       reportedImpact:
                         "Official recall detected from government safety source.",
                       recommendedAction:
-                        guidance.actions?.[0] ||
-                        "Review official recall instructions.",
+                        guidance.actions?.[0] || "Review official recall instructions.",
                       confidence: "High",
                       plainEnglishSummary:
-                        r.reason_for_recall ||
-                        "Potential product safety issue detected.",
+                        r.reason_for_recall || "Potential product safety issue detected.",
                     }}
                     loading={false}
                     source="FDA"
@@ -1024,6 +1170,17 @@ ${url}`;
           </motion.div>
         )}
       </AnimatePresence>
+
+      {showScanner && (
+        <BarcodeScanner
+          onClose={() => setShowScanner(false)}
+          onResult={(value: string) => {
+            setQuery(value);
+            setShowScanner(false);
+            setTimeout(() => searchRecalls(value), 150);
+          }}
+        />
+      )}
     </div>
   );
 }

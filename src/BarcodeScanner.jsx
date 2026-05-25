@@ -2,18 +2,72 @@ import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { DecodeHintType } from "@zxing/library";
 
-async function lookupBarcode(barcode) {
-  try {
-    const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-    const data = await res.json();
-    if (data.status === 1 && data.product) {
-      const p = data.product;
-      return p.product_name_en || p.product_name || p.generic_name || p.brands || null;
-    }
-    return null;
-  } catch {
-    return null;
+function expandUPCE(upce) {
+  const code = upce.length === 8 ? upce.slice(1, 7) : upce;
+  if (code.length !== 6) return null;
+
+  const [a, b, c, d, e, f] = code;
+
+  if (["0", "1", "2"].includes(f)) {
+    return `0${a}${b}${f}0000${c}${d}${e}`;
   }
+
+  if (f === "3") {
+    return `0${a}${b}${c}00000${d}${e}`;
+  }
+
+  if (f === "4") {
+    return `0${a}${b}${c}${d}00000${e}`;
+  }
+
+  return `0${a}${b}${c}${d}${e}0000${f}`;
+}
+
+async function lookupBarcode(barcode) {
+  const cleaned = String(barcode).replace(/\D/g, "");
+
+  const variants = [
+    cleaned,
+    cleaned.padStart(12, "0"),
+    cleaned.padStart(13, "0"),
+  ];
+
+  const upcExpanded = expandUPCE(cleaned);
+
+  if (upcExpanded) {
+    variants.push(upcExpanded);
+    variants.push(upcExpanded.padStart(13, "0"));
+  }
+
+  const uniqueVariants = [...new Set(variants)];
+
+  for (const code of uniqueVariants) {
+    try {
+      console.log("Trying barcode lookup:", code);
+
+      const res = await fetch(
+        `https://world.openfoodfacts.org/api/v0/product/${code}.json`
+      );
+
+      const data = await res.json();
+
+      if (data.status === 1 && data.product) {
+        const p = data.product;
+
+        return (
+          p.product_name_en ||
+          p.product_name ||
+          p.generic_name ||
+          p.brands ||
+          null
+        );
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
 }
 
 export default function BarcodeScanner({ onResult, onClose }) {
@@ -97,15 +151,25 @@ export default function BarcodeScanner({ onResult, onClose }) {
           setPhase("found");
           setFoundText("Looking up product…");
 
-          const name = await lookupBarcode(barcode);
-          const label = name || `Barcode: ${barcode}`;
+        const name = await lookupBarcode(barcode);
 
-          setFoundText(label);
+        if (!name) {
+          setFoundText(`Barcode found: ${barcode}. Searching barcode...`);
 
           setTimeout(() => {
-            onResult(name || barcode);
+            onResult(barcode);
             onClose();
-          }, 900);
+          }, 1200);
+
+          return;
+        }
+
+        setFoundText(name);
+
+        setTimeout(() => {
+          onResult(name);
+          onClose();
+        }, 900);
         }
       );
 
