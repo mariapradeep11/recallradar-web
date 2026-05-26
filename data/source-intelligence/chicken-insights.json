@@ -1,0 +1,454 @@
+{
+  "term": "chicken",
+  "generatedAt": "2026-05-26T21:38:51.574Z",
+  "source": {
+    "name": "FDA openFDA Food Enforcement",
+    "url": "https://api.fda.gov/food/enforcement.json",
+    "search": "product_description:chicken"
+  },
+  "totalOfficialMatches": 515,
+  "recordsPulled": 500,
+  "cappedAt": 500,
+  "byYear": [
+    [
+      "2023",
+      88
+    ],
+    [
+      "2015",
+      58
+    ],
+    [
+      "2024",
+      52
+    ],
+    [
+      "2016",
+      47
+    ],
+    [
+      "2019",
+      46
+    ],
+    [
+      "2020",
+      38
+    ],
+    [
+      "2012",
+      32
+    ],
+    [
+      "2025",
+      24
+    ],
+    [
+      "2017",
+      23
+    ],
+    [
+      "2021",
+      21
+    ],
+    [
+      "2014",
+      19
+    ],
+    [
+      "2013",
+      18
+    ]
+  ],
+  "byClassification": [
+    [
+      "Class I",
+      286
+    ],
+    [
+      "Class II",
+      189
+    ],
+    [
+      "Class III",
+      25
+    ]
+  ],
+  "topCompanies": [
+    [
+      "FRESH IDEATION FOOD GROUP, LLC dba Fresh Creative Cuisine",
+      56
+    ],
+    [
+      "Reser's Fine Foods, Inc.",
+      26
+    ],
+    [
+      "Newly Weds Foods, Inc.",
+      21
+    ],
+    [
+      "Whole Foods Market",
+      20
+    ],
+    [
+      "SunBurst Foods, Inc.",
+      19
+    ],
+    [
+      "Spartan Central Kitchen",
+      15
+    ],
+    [
+      "Giant Eagle, Inc.",
+      12
+    ],
+    [
+      "Fresh & Ready Foods LLC",
+      11
+    ],
+    [
+      "Lipari Foods Operating Company, LLC.",
+      8
+    ],
+    [
+      "TreeHouse Foods, Inc.",
+      7
+    ]
+  ],
+  "topStates": [
+    [
+      "MD",
+      67
+    ],
+    [
+      "CA",
+      53
+    ],
+    [
+      "TX",
+      46
+    ],
+    [
+      "MI",
+      33
+    ],
+    [
+      "IL",
+      30
+    ],
+    [
+      "OR",
+      30
+    ],
+    [
+      "NC",
+      26
+    ],
+    [
+      "OH",
+      24
+    ],
+    [
+      "PA",
+      24
+    ],
+    [
+      "WA",
+      18
+    ]
+  ],
+  "topRiskKeywords": [
+    [
+      "listeria",
+      231
+    ],
+    [
+      "contamination",
+      98
+    ],
+    [
+      "undeclared",
+      95
+    ],
+    [
+      "plastic",
+      73
+    ],
+    [
+      "salmonella",
+      59
+    ],
+    [
+      "allergen",
+      39
+    ],
+    [
+      "metal",
+      17
+    ],
+    [
+      "foreign material",
+      5
+    ],
+    [
+      "illness",
+      2
+    ],
+    [
+      "e. coli",
+      1
+    ],
+    [
+      "glass",
+      1
+    ]
+  ],
+  "actionSignals": [
+    [
+      "contamination",
+      98
+    ],
+    [
+      "allergen",
+      37
+    ],
+    [
+      "foreign material",
+      5
+    ],
+    [
+      "return",
+      1
+    ]
+  ],
+  "sampleRecords": [
+    {
+      "id": "fda-food-F-2949-2017",
+      "source": "FDA",
+      "category": "Food",
+      "product": "Dierbergs Kitchen, Grilled Chicken Caesar Wrap, NET WT. 10 oz, UPC 0 233983 804994",
+      "company": "Dierbergs Markets, Inc Corporate Office",
+      "reason": "Undeclared anchovy in wraps.",
+      "classification": "Class I",
+      "status": "Terminated",
+      "state": "MO",
+      "country": "United States",
+      "reportDate": "2017-08-02",
+      "recallInitiationDate": "2017-06-28",
+      "distributionPattern": "Product was distributed to the firm's retail grocery stores in eastern Missouri and western Missouri.",
+      "recallNumber": "F-2949-2017",
+      "keywords": [
+        "undeclared"
+      ]
+    },
+    {
+      "id": "fda-food-F-1902-2013",
+      "source": "FDA",
+      "category": "Food",
+      "product": "Bean & Cheese Burrito Filling, 10 lb bags Labeled in part \"13210 B 1 77220 13:38 KEEP FROZEN BEAN & CHEESE BURRITO FILLING***INGREDIENTS: COOKED PINTO BEANS, WATER, CHEDDAR CHEESE***SOYBEAN OIL***STARCH-MODIFIED, ONIONS, CHEESE SAUCE BASE***CONTAINS LESS THAN 2% OF CHILI PEPPER, SALT, CHICKEN BASE***SODIUM PHOSPHATES, SPICE, CARAMEL COLOR DEHYDRATED, GARLIC, ANNATTTO EXTRACT.\"  CONTAINS: Soy, Milk, Wheat JTM Food Group 200 Sales Dr. Harrison, OH 45030 Phone 800.626.2308.",
+      "company": "JTM Provisions Co Inc",
+      "reason": "Undeclared eggs in the product.  The firm was notified by their customer that the product contains pasta.  The pasta contains eggs which is not declared on the label.",
+      "classification": "Class I",
+      "status": "Terminated",
+      "state": "OH",
+      "country": "United States",
+      "reportDate": "2013-09-25",
+      "recallInitiationDate": "2013-09-11",
+      "distributionPattern": "Product was shipped to one manufacturer in MN.",
+      "recallNumber": "F-1902-2013",
+      "keywords": [
+        "undeclared"
+      ]
+    },
+    {
+      "id": "fda-food-F-0832-2023",
+      "source": "FDA",
+      "category": "Food",
+      "product": "Fresh From Meijer Chicken Cobb Salad 8.8 Oz UPC - 719283679321",
+      "company": "Meijer Inc",
+      "reason": "Listeria monocytogenes",
+      "classification": "Class I",
+      "status": "Terminated",
+      "state": "MI",
+      "country": "United States",
+      "reportDate": "2023-05-17",
+      "recallInitiationDate": "2023-04-05",
+      "distributionPattern": "Meijer stores in Michigan, Indiana, Illinois, Ohio, Kentucky, and Wisconsin",
+      "recallNumber": "F-0832-2023",
+      "keywords": [
+        "listeria"
+      ]
+    },
+    {
+      "id": "fda-food-F-0095-2020",
+      "source": "FDA",
+      "category": "Food",
+      "product": "Chicken Salad Croissant Sandwich, UPC 2 07275-XXXXX.  Keep Refrigerated.",
+      "company": "Coborn's, Inc",
+      "reason": "Chicken Salad sandwiches have the potential to be contaminated with Listeria monocytogenes.",
+      "classification": "Class I",
+      "status": "Terminated",
+      "state": "MN",
+      "country": "United States",
+      "reportDate": "2019-10-30",
+      "recallInitiationDate": "2019-10-01",
+      "distributionPattern": "MN, ND, SD, WI",
+      "recallNumber": "F-0095-2020",
+      "keywords": [
+        "listeria"
+      ]
+    },
+    {
+      "id": "fda-food-F-0577-2015",
+      "source": "FDA",
+      "category": "Food",
+      "product": "Kerry 52-0189-02 All Purpose Beef & Chicken Meatball Seasoning, Net WT 43.42 lbs (19.69 Kg) , B18517.01.",
+      "company": "Kerry Foods",
+      "reason": "Kerry Ingredients is recalling two products, Italian Pork and Beef Meatball Seasoning, and Beef and Chicken Meatball Seasoning, because they were processed on the same equipment as Breakfast Sausage Seasoning which tested positive for Salmonella.  Kerry determined that the source of the Salmonella was an ingredient used in the Breakfast Sausage Seasoning.",
+      "classification": "Class II",
+      "status": "Terminated",
+      "state": "WI",
+      "country": "United States",
+      "reportDate": "2014-12-03",
+      "recallInitiationDate": "2014-05-12",
+      "distributionPattern": "IL, WI, KY, PA, AR, KS.    CANADA",
+      "recallNumber": "F-0577-2015",
+      "keywords": [
+        "salmonella"
+      ]
+    },
+    {
+      "id": "fda-food-F-2951-2017",
+      "source": "FDA",
+      "category": "Food",
+      "product": "Dierbergs Kitchen, Santa Fe Grilled Chicken Wrap, NET WT. 11 oz, UPC 0 231789 804996",
+      "company": "Dierbergs Markets, Inc Corporate Office",
+      "reason": "Undeclared milk in wraps.",
+      "classification": "Class I",
+      "status": "Terminated",
+      "state": "MO",
+      "country": "United States",
+      "reportDate": "2017-08-02",
+      "recallInitiationDate": "2017-06-28",
+      "distributionPattern": "Product was distributed to the firm's retail grocery stores in eastern Missouri and western Missouri.",
+      "recallNumber": "F-2951-2017",
+      "keywords": [
+        "undeclared"
+      ]
+    },
+    {
+      "id": "fda-food-F-0965-2018",
+      "source": "FDA",
+      "category": "Food",
+      "product": "Product Name \tLot Number or ID     Premix Roasted Chicken 1258969\t660025",
+      "company": "GRIFFITH FOODS",
+      "reason": "Griffith Foods, Inc. has initiated a voluntary recall of multiple products following a supplier's recall of Autolyzed Yeast Powder due to the presence of Salmonella.",
+      "classification": "Class II",
+      "status": "Terminated",
+      "state": "IL",
+      "country": "United States",
+      "reportDate": "2018-04-04",
+      "recallInitiationDate": "2018-03-14",
+      "distributionPattern": "Domestic: IL, TX, VA, WI, OK, MS    Foreign: Canada",
+      "recallNumber": "F-0965-2018",
+      "keywords": [
+        "salmonella"
+      ]
+    },
+    {
+      "id": "fda-food-F-0656-2020",
+      "source": "FDA",
+      "category": "Food",
+      "product": "Premo and Fresh Grab Chicken Salad Wedge Sandwich, 5 oz., UPC: 612510002032",
+      "company": "Lipari Foods Operating Company, LLC.",
+      "reason": "Products recalled due to potential contamination with Listeria monocytogenes",
+      "classification": "Class I",
+      "status": "Terminated",
+      "state": "MI",
+      "country": "United States",
+      "reportDate": "2020-02-12",
+      "recallInitiationDate": "2020-01-06",
+      "distributionPattern": "The products were distributed exclusively by Lipari Foods in Warren, Michigan to food service and retail stores throughout Alabama, Florida, Iowa, Illinois, Indiana, Kentucky, Maryland, Michigan, Minnesota, Missouri, Ohio, Pennsylvania, Tennessee, West Virginia, and Wisconsin.",
+      "recallNumber": "F-0656-2020",
+      "keywords": [
+        "listeria",
+        "contamination"
+      ]
+    },
+    {
+      "id": "fda-food-F-1180-2014",
+      "source": "FDA",
+      "category": "Food",
+      "product": "Reser's Honey Chicken Salad Kit, Formula DR.105B32, packaged in 6/40-oz carton cases. Distributed by Reser's Fine Foods, Beaverton, OR.  UPC 7111711428",
+      "company": "Reser's Fine Foods, Inc.",
+      "reason": "The recalled products are potentially contaminated with Listeria monocytogenes.",
+      "classification": "Class I",
+      "status": "Terminated",
+      "state": "OR",
+      "country": "United States",
+      "reportDate": "2014-01-01",
+      "recallInitiationDate": "2013-10-22",
+      "distributionPattern": "Distribution was made to AL, AR, AZ, CA, CO, CT, DE, FL, GA, HI, IA, IL, IN, KS, KY, LA, MA, MD, ME, MI, MO, MS, NC, NE, NH, NJ, NM, NV, NY, OH, OK, OR, PA, SC, SD, TN, TX, VA, WI, WV AND WY.   Distribution was also made to Canada.",
+      "recallNumber": "F-1180-2014",
+      "keywords": [
+        "listeria"
+      ]
+    },
+    {
+      "id": "fda-food-F-0661-2015",
+      "source": "FDA",
+      "category": "Food",
+      "product": "Whole Foods Market Balsamic Chicken Breast & Peaches, UPC/PLU 20254100000",
+      "company": "Whole Foods Market",
+      "reason": "The product has the potential to be contaminated with Listeria monocytogenes.",
+      "classification": "Class II",
+      "status": "Terminated",
+      "state": "TX",
+      "country": "United States",
+      "reportDate": "2014-12-17",
+      "recallInitiationDate": "2014-07-23",
+      "distributionPattern": "All states where Whole Foods Market stores are located except Florida, Washington, and Oregon.",
+      "recallNumber": "F-0661-2015",
+      "keywords": [
+        "listeria"
+      ]
+    },
+    {
+      "id": "fda-food-F-0228-2017",
+      "source": "FDA",
+      "category": "Food",
+      "product": "National Foods Packaging Low Sodium Chicken Base in 50 lb white poly-lined paper bags",
+      "company": "National Foods Packaging Inc",
+      "reason": "Product contains a spice which was tested and found to contain elevated levels of lead.",
+      "classification": "Class III",
+      "status": "Terminated",
+      "state": "OH",
+      "country": "United States",
+      "reportDate": "2016-10-26",
+      "recallInitiationDate": "2016-09-16",
+      "distributionPattern": "US Nationwide.  The product was distributed to the following states: IN, TX, VA",
+      "recallNumber": "F-0228-2017",
+      "keywords": []
+    },
+    {
+      "id": "fda-food-F-1388-2020",
+      "source": "FDA",
+      "category": "Food",
+      "product": "Cajun Style Chicken Meal PLU# 24658700000. Expiration date 8/5/2020.Ingredients: MEAL [CAJUN STYLE BOWTIE PASTA (BOWTIE PASTA (COOKED ENRICHED MACARONI PRODUCT [WATER, SEMOLINA, EGG WHITES, NIACIN, FERROUS SULFATE, THIAMIN MONONITRATE, RIBOFLAVIN, FOLIC ACID], SOYBEAN OIL, CONTAINS LESS THAN 2% OF CULTURED DEXTROSE, SALT), ALFREDO SAUCE [MILK (MILK, VITAMIN D3), HEAVY CREAM (CREAM, MILK), WATER, PARMESAN CHEESE (PASTEURIZED PART-SKIM MILK, CHEESE CULTURE, SALT, ENZYMES, POWDERED CELLULOSE [ANTI-CAKING AGENT]), CORNSTARCH, ROMANO CHEESE (PASTEURIZED SHEEP S MILK, CHEESE CULTURES, SALT, ENZYMES, POWDERED CELLULOSE [ANTI-CAKING AGENT]), CONTAINS 2% OR LESS OF ENRICHED WHEAT FLOUR (WHEAT FLOUR, MALTED BARLEY FLOUR, NIACIN, REDUCED IRON, THIAMINE MONONITRATE, RIBOFLAVIN, FOLIC ACID), SALT, WHITE PEPPER, GARLIC POWDER, LEMON PEEL], PEPPERS & ONIONS [RED BELL PEPPER, GREEN BELL PEPPER, YELLOW BELL PEPPER, YELLOW ONION, OIL BLEND (CANOLA OIL, EXTRA VIRGIN OLIVE OIL), SALT, BLACK PEPPER], CAJUN SEASONING (GARLIC, SPICES [INCLUDING PAPRIKA, OREGANO, RED PEPPER], SALT, ONION)), GRILLED CHICKEN (CHICKEN BREAST [BONELESS SKINLESS CHICKEN BREAST], WATER, ISOLATED SOY PROTEIN, SALT, SODIUM PHOSPHATES, BLACK PEPPER), PEPPERS & ONIONS [RED BELL PEPPER, GREEN BELL PEPPER, YELLOW BELL PEPPER, YELLOW ONION, OIL BLEND (CANOLA OIL, EXTRA VIRGIN OLIVE OIL), SALT, BLACK PEPPER], PARMESAN CHEESE (PASTEURIZED PART SKIM MILK, CHEESE CULTURES AND/OR RENNET, SALT, ENZYMES, STARCH, POWDERED CELLULOSE TO PREVENT CAKING, NATAMYCIN TO PROTECT FLAVOR), PARSLEY, CAJUN SEASONING (GARLIC, SPICES [INCLUDING PAPRIKA, OREGANO, RED PEPPER], SALT, ONION)]. Onions are cooked.",
+      "company": "Giant Eagle",
+      "reason": "Potential contamination with Salmonella Newport  in onions and prepared foods containing onions.",
+      "classification": "Class II",
+      "status": "Terminated",
+      "state": "PA",
+      "country": "United States",
+      "reportDate": "2020-09-09",
+      "recallInitiationDate": "2020-08-02",
+      "distributionPattern": "Product was produced and sold in Giant Eagle and Market District locations in IN, OH, MD, WV and PA.",
+      "recallNumber": "F-1388-2020",
+      "keywords": [
+        "salmonella",
+        "contamination"
+      ]
+    }
+  ]
+}

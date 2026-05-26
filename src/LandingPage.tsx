@@ -5,6 +5,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
 import * as THREE from "three";
 import RecallRadarLogo from "./RecallRadarLogo";
+import chickenInsights from "../data/source-intelligence/chicken-insights.json";
 
 type Category = "food" | "drug" | "device" | "consumer";
 
@@ -489,6 +490,7 @@ export default function LandingPage({
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const [commandMode, setCommandMode] = useState<"search" | "monitor">("search");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [proofRevealed, setProofRevealed] = useState(false);
 
   const joinWaitlist = async () => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -560,6 +562,18 @@ export default function LandingPage({
     { source: "CPSC", scope: "Consumer Products", count: "1", label: "source" },
     { source: "NHTSA", scope: "Vehicles", count: "1", label: "vehicle graph" },
   ];
+
+  const chickenProof = {
+    total: chickenInsights.totalOfficialMatches,
+    pulled: chickenInsights.recordsPulled,
+    generatedAt: new Date(chickenInsights.generatedAt).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
+    classes: chickenInsights.byClassification,
+    signals: chickenInsights.topRiskKeywords.slice(0, 5),
+  };
 
   return (
     <main className="rr-landing">
@@ -716,6 +730,79 @@ export default function LandingPage({
           ))}
         </section>
       </div>
+
+      <section className="rr-proof-section" aria-labelledby="proof-title">
+        <div className="rr-proof-copy">
+          <p className="rr-section-kicker">WHAT THE LABEL DOESN'T TELL YOU</p>
+          <h2 id="proof-title">Your food can look normal. The recall record tells another story.</h2>
+          <p>
+            A search for chicken surfaces hundreds of official FDA enforcement records across Listeria, Salmonella, undeclared allergens, plastic, and other signals. RecallRadar turns that hidden public record into something a household can understand.
+          </p>
+          <div className="rr-proof-actions">
+            <button className="rr-primary rr-proof-primary" onClick={() => setProofRevealed((value) => !value)}>
+              {proofRevealed ? "Hide recall layer" : "Reveal the recall layer"} <ArrowIcon />
+            </button>
+            <button className="rr-proof-link" onClick={onLaunch}>Search a product <ArrowIcon /></button>
+          </div>
+        </div>
+
+        <aside className="rr-proof-card">
+          <div className="rr-proof-visual">
+            <img src="/images/chicken/chicken-recall-specimen.png" alt="Chicken surrounded by recall risk signals" />
+            <div className="rr-proof-visual-vignette" />
+            {chickenProof.signals.map(([label, count], index) => (
+              <button
+                type="button"
+                key={label}
+                className={`rr-organism rr-organism-${index + 1}`}
+                aria-label={`${label}: ${count} FDA food enforcement matches in the pulled chicken recall records`}
+              >
+                <i />
+                <b>{label}</b>
+                <em>{count}</em>
+                <small>
+                  FDA food enforcement
+                  <br />
+                  {count} matches in {chickenProof.pulled.toLocaleString()} pulled records
+                </small>
+              </button>
+            ))}
+            {!proofRevealed && (
+              <button className="rr-proof-reveal-hotspot" onClick={() => setProofRevealed(true)}>
+                <RadarLensButton label="" />
+                <span>Tap to reveal what recall data sees</span>
+              </button>
+            )}
+          </div>
+
+          <AnimatePresence initial={false}>
+            {proofRevealed && (
+              <motion.div
+                className="rr-proof-data"
+                initial={{ opacity: 0, y: 14, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, y: 10, height: 0 }}
+              >
+                <div className="rr-proof-card-head">
+                  <span>FDA FOOD ENFORCEMENT</span>
+                  <b>Official snapshot</b>
+                </div>
+                <strong>{chickenProof.total.toLocaleString()}</strong>
+                <p>official matches for “chicken”</p>
+                <div className="rr-proof-classes">
+                  {chickenProof.classes.map(([label, count]) => (
+                    <div key={label}>
+                      <span>{label}</span>
+                      <b>{count}</b>
+                    </div>
+                  ))}
+                </div>
+                <small>FDA openFDA Food Enforcement API • pulled {chickenProof.pulled.toLocaleString()} records • {chickenProof.generatedAt}</small>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </aside>
+      </section>
 
       <section id="how-it-works" className="rr-section rr-how">
         <div className="rr-section-head">
@@ -1607,6 +1694,579 @@ export default function LandingPage({
           line-height: 1.38;
         }
 
+        .rr-proof-section {
+          position: relative;
+          z-index: 4;
+          display: grid;
+          grid-template-columns: minmax(320px, 1fr) minmax(320px, 430px);
+          align-items: center;
+          gap: clamp(36px, 6vw, 86px);
+          width: min(100% - 56px, 1256px);
+          margin: 0 auto;
+          padding: 118px 0 100px;
+        }
+
+        .rr-proof-section::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(255,59,48,.32), rgba(255,255,255,.1), transparent);
+        }
+
+        .rr-proof-copy h2 {
+          max-width: 780px;
+          margin: 0;
+          color: #fff;
+          font-size: clamp(42px, 5.2vw, 76px);
+          font-weight: 270;
+          line-height: 1;
+          letter-spacing: 0;
+          text-shadow: 0 0 24px rgba(255,255,255,.12);
+        }
+
+        .rr-proof-copy > p {
+          max-width: 640px;
+          margin: 26px 0 34px;
+          color: rgba(255,255,255,.56);
+          font-size: 18px;
+          line-height: 1.68;
+        }
+
+        .rr-proof-actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .rr-proof-primary svg {
+          width: 38px;
+          height: 38px;
+        }
+
+        .rr-proof-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          min-height: 48px;
+          padding: 0 18px;
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 999px;
+          background: rgba(255,255,255,.025);
+          color: rgba(255,255,255,.72);
+          font: inherit;
+          font-weight: 760;
+          cursor: pointer;
+        }
+
+        .rr-proof-link svg {
+          width: 16px;
+          height: 16px;
+          color: #ff3b30;
+        }
+
+        .rr-proof-card {
+          position: relative;
+          padding: 0;
+          border: 1px solid rgba(255,255,255,.12);
+          border-radius: 24px;
+          background:
+            radial-gradient(circle at 72% 18%, rgba(255,59,48,.18), transparent 34%),
+            linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.055), 0 30px 90px rgba(0,0,0,.35);
+          overflow: hidden;
+          backdrop-filter: blur(18px);
+        }
+
+        .rr-proof-card::before {
+          content: "";
+          position: absolute;
+          left: -18%;
+          top: 50%;
+          width: 136%;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(255,59,48,.8), rgba(255,255,255,.36), rgba(255,59,48,.8), transparent);
+          box-shadow: 0 0 24px rgba(255,59,48,.34);
+          opacity: .34;
+        }
+
+        .rr-proof-card > * {
+          position: relative;
+          z-index: 1;
+        }
+
+        .rr-proof-visual {
+          position: relative;
+          min-height: 410px;
+          overflow: hidden;
+          background:
+            radial-gradient(circle at 50% 58%, rgba(255,59,48,.2), transparent 34%),
+            #050505;
+        }
+
+        .rr-proof-visual img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          filter: sepia(.1) saturate(.9) hue-rotate(-4deg) contrast(1.12) brightness(.72);
+          transform: scale(1.03);
+        }
+
+        .rr-proof-visual::before,
+        .rr-proof-visual::after {
+          content: "";
+          position: absolute;
+          z-index: 1;
+          pointer-events: none;
+        }
+
+        .rr-proof-visual::before {
+          left: 50%;
+          bottom: 18px;
+          width: min(78%, 520px);
+          aspect-ratio: 1;
+          border: 1px solid rgba(255,59,48,.28);
+          border-radius: 999px;
+          transform: translateX(-50%) rotateX(68deg);
+          background:
+            repeating-radial-gradient(circle, transparent 0 26px, rgba(255,59,48,.18) 27px 28px, transparent 29px 48px),
+            linear-gradient(90deg, transparent 49.5%, rgba(255,255,255,.22) 50%, transparent 50.5%),
+            linear-gradient(0deg, transparent 49.5%, rgba(255,255,255,.14) 50%, transparent 50.5%);
+          box-shadow: 0 0 42px rgba(255,59,48,.18);
+          opacity: .56;
+        }
+
+        .rr-proof-visual::after {
+          left: 6%;
+          right: 6%;
+          top: 52%;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, rgba(255,59,48,.2), rgba(255,255,255,.58), rgba(255,59,48,.36), transparent);
+          box-shadow: 0 0 28px rgba(255,59,48,.38);
+          opacity: .46;
+          animation: rrProofScan 4.8s ease-in-out infinite;
+        }
+
+        .rr-proof-visual-vignette {
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(circle at 50% 42%, transparent 0 36%, rgba(0,0,0,.3) 70%, rgba(0,0,0,.78) 100%),
+            linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.58)),
+            radial-gradient(circle at 52% 76%, rgba(255,59,48,.24), transparent 32%);
+        }
+
+        .rr-organism {
+          --parasite: #ffd35a;
+          --parasite-dark: #7a3b08;
+          --parasite-glow: rgba(255, 211, 90, .46);
+          position: absolute;
+          z-index: 2;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: clamp(58px, 5vw, 78px);
+          height: clamp(58px, 5vw, 78px);
+          padding: 0;
+          border: 1px solid color-mix(in srgb, var(--parasite) 48%, transparent);
+          border-radius: 999px;
+          background:
+            radial-gradient(circle at 34% 30%, rgba(255,255,255,.18), transparent 17%),
+            radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--parasite) 16%, transparent), rgba(255,59,48,.025) 48%, rgba(0,0,0,.42) 72%),
+            rgba(0,0,0,.22);
+          color: rgba(255,255,255,.82);
+          box-shadow: inset 0 0 24px rgba(255,255,255,.06), 0 0 28px var(--parasite-glow);
+          backdrop-filter: blur(12px);
+          animation: rrOrganismFloat 5.8s ease-in-out infinite;
+          appearance: none;
+          cursor: help;
+          font: inherit;
+          text-align: left;
+        }
+
+        .rr-organism::before {
+          content: "";
+          position: absolute;
+          inset: -10px;
+          border: 1px solid color-mix(in srgb, var(--parasite) 22%, transparent);
+          border-radius: inherit;
+          background: radial-gradient(circle, transparent 54%, color-mix(in srgb, var(--parasite) 18%, transparent) 55%, transparent 58%);
+          opacity: .7;
+        }
+
+        .rr-organism::after {
+          content: "";
+          position: absolute;
+          inset: 13px;
+          border-radius: inherit;
+          background:
+            conic-gradient(from 20deg, transparent 0 10deg, rgba(255,255,255,.38) 11deg 13deg, transparent 14deg 34deg, color-mix(in srgb, var(--parasite) 72%, transparent) 35deg 38deg, transparent 39deg 360deg);
+          filter: blur(.2px);
+          opacity: .78;
+          animation: rrLensRotate 7s linear infinite;
+        }
+
+        .rr-organism i {
+          position: relative;
+          z-index: 1;
+          width: 36px;
+          height: 17px;
+          border-radius: 58% 42% 54% 46% / 62% 48% 52% 38%;
+          background:
+            radial-gradient(circle at 22% 28%, rgba(255,255,255,.9), transparent 15%),
+            repeating-linear-gradient(90deg, color-mix(in srgb, var(--parasite) 90%, #fff) 0 4px, var(--parasite-dark) 5px 7px),
+            linear-gradient(135deg, var(--parasite), var(--parasite-dark));
+          box-shadow: 0 0 18px var(--parasite-glow);
+          transform: rotate(-18deg);
+        }
+
+        .rr-organism i::before,
+        .rr-organism i::after {
+          content: "";
+          position: absolute;
+          pointer-events: none;
+        }
+
+        .rr-organism i::before {
+          left: -9px;
+          top: 7px;
+          width: 16px;
+          height: 7px;
+          border-radius: 999px 0 0 999px;
+          border-top: 2px solid var(--parasite);
+          border-left: 2px solid var(--parasite);
+          transform: rotate(-34deg);
+          filter: drop-shadow(0 0 5px var(--parasite-glow));
+        }
+
+        .rr-organism i::after {
+          right: -13px;
+          top: 7px;
+          width: 18px;
+          height: 12px;
+          border-radius: 50%;
+          border-top: 2px solid var(--parasite);
+          border-right: 2px solid var(--parasite);
+          box-shadow:
+            7px -4px 0 -5px var(--parasite),
+            9px 4px 0 -5px var(--parasite);
+          transform: rotate(24deg);
+          filter: drop-shadow(0 0 5px var(--parasite-glow));
+        }
+
+        .rr-organism b {
+          position: absolute;
+          left: 50%;
+          bottom: -30px;
+          z-index: 2;
+          max-width: 130px;
+          padding: 5px 9px;
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 999px;
+          background: rgba(0,0,0,.62);
+          font-size: 11px;
+          font-weight: 820;
+          line-height: 1;
+          text-transform: capitalize;
+          white-space: nowrap;
+          transform: translateX(-50%);
+        }
+
+        .rr-organism em {
+          position: absolute;
+          right: 6px;
+          top: 6px;
+          z-index: 2;
+          display: grid;
+          place-items: center;
+          min-width: 26px;
+          height: 26px;
+          padding: 0 5px;
+          border-radius: 999px;
+          background: rgba(0,0,0,.72);
+          color: var(--parasite);
+          font-size: 10px;
+          font-style: normal;
+          font-weight: 900;
+          text-shadow: 0 0 12px var(--parasite-glow);
+        }
+
+        .rr-organism small {
+          position: absolute;
+          left: 50%;
+          bottom: calc(100% + 10px);
+          width: max-content;
+          max-width: 220px;
+          padding: 10px 12px;
+          border: 1px solid color-mix(in srgb, var(--parasite) 36%, transparent);
+          border-radius: 12px;
+          background: rgba(5,5,5,.9);
+          color: rgba(255,255,255,.7);
+          box-shadow: 0 18px 38px rgba(0,0,0,.42), 0 0 28px var(--parasite-glow);
+          font-size: 11px;
+          font-weight: 720;
+          line-height: 1.45;
+          opacity: 0;
+          pointer-events: none;
+          transform: translate(-50%, 8px);
+          transition: opacity .2s ease, transform .2s ease;
+          white-space: normal;
+        }
+
+        .rr-organism small::after {
+          content: "";
+          position: absolute;
+          left: 50%;
+          top: 100%;
+          width: 8px;
+          height: 8px;
+          border-right: 1px solid color-mix(in srgb, var(--parasite) 36%, transparent);
+          border-bottom: 1px solid color-mix(in srgb, var(--parasite) 36%, transparent);
+          background: rgba(5,5,5,.9);
+          transform: translate(-50%, -4px) rotate(45deg);
+        }
+
+        .rr-organism:hover,
+        .rr-organism:focus-visible {
+          border-color: color-mix(in srgb, var(--parasite) 66%, white 18%);
+          background:
+            radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--parasite) 24%, transparent), rgba(0,0,0,.7) 70%);
+          color: #fff;
+          outline: none;
+          box-shadow: 0 0 34px var(--parasite-glow);
+        }
+
+        .rr-organism:hover small,
+        .rr-organism:focus-visible small {
+          opacity: 1;
+          transform: translate(-50%, 0);
+        }
+
+        .rr-organism-1 {
+          --parasite: #ffe06a;
+          --parasite-dark: #9d5d0f;
+          --parasite-glow: rgba(255, 224, 106, .42);
+          left: 13%;
+          top: 18%;
+          animation-delay: -.4s;
+        }
+
+        .rr-organism-2 {
+          --parasite: #c6ff5f;
+          --parasite-dark: #3f6d15;
+          --parasite-glow: rgba(198, 255, 95, .34);
+          right: 12%;
+          top: 22%;
+          animation-delay: -1.3s;
+        }
+
+        .rr-organism-3 {
+          --parasite: #ffb24a;
+          --parasite-dark: #8f330d;
+          --parasite-glow: rgba(255, 178, 74, .38);
+          left: 11%;
+          bottom: 31%;
+          animation-delay: -2.1s;
+        }
+
+        .rr-organism-4 {
+          --parasite: #ffdb76;
+          --parasite-dark: #7d5216;
+          --parasite-glow: rgba(255, 219, 118, .34);
+          right: 18%;
+          bottom: 18%;
+          animation-delay: -3s;
+        }
+
+        .rr-organism-5 {
+          --parasite: #d8b6ff;
+          --parasite-dark: #57307d;
+          --parasite-glow: rgba(216, 182, 255, .32);
+          left: 40%;
+          bottom: 15%;
+          animation-delay: -4s;
+        }
+
+        @keyframes rrProofScan {
+          0%, 100% {
+            transform: translateY(-16px);
+            opacity: .24;
+          }
+          50% {
+            transform: translateY(18px);
+            opacity: .58;
+          }
+        }
+
+        .rr-proof-reveal-hotspot {
+          position: absolute;
+          z-index: 3;
+          left: 50%;
+          bottom: 24px;
+          display: inline-flex;
+          align-items: center;
+          gap: 12px;
+          max-width: calc(100% - 44px);
+          min-height: 58px;
+          padding: 7px 16px 7px 7px;
+          border: 1px solid rgba(255,59,48,.35);
+          border-radius: 999px;
+          background: rgba(0,0,0,.62);
+          color: #fff;
+          transform: translateX(-50%);
+          box-shadow: 0 0 34px rgba(255,59,48,.24);
+          backdrop-filter: blur(16px);
+          font: inherit;
+          font-size: 13px;
+          font-weight: 780;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .rr-proof-reveal-hotspot .rr-lens-core {
+          width: 42px;
+          height: 42px;
+        }
+
+        .rr-proof-reveal-hotspot .rr-lens-core i {
+          transform-origin: 50% 20px;
+        }
+
+        .rr-proof-data {
+          overflow: hidden;
+          padding: 24px 26px 26px;
+          border-top: 1px solid rgba(255,255,255,.09);
+          background:
+            radial-gradient(circle at 78% 12%, rgba(255,59,48,.14), transparent 38%),
+            rgba(0,0,0,.42);
+        }
+
+        .rr-proof-card-head {
+          display: flex;
+          justify-content: space-between;
+          gap: 18px;
+          margin-bottom: 26px;
+        }
+
+        .rr-proof-card-head span,
+        .rr-proof-card-head b {
+          color: #ff4a40;
+          font-size: 11px;
+          font-weight: 850;
+          letter-spacing: .22em;
+        }
+
+        .rr-proof-card-head b {
+          color: rgba(255,255,255,.38);
+          letter-spacing: .08em;
+          text-transform: uppercase;
+        }
+
+        .rr-proof-data > strong {
+          display: block;
+          color: #fff;
+          font-size: clamp(72px, 7vw, 112px);
+          font-weight: 760;
+          letter-spacing: -.04em;
+          line-height: .86;
+          text-shadow: 0 0 28px rgba(255,59,48,.2);
+        }
+
+        .rr-proof-data > p {
+          margin: 12px 0 26px;
+          color: rgba(255,255,255,.58);
+          font-size: 16px;
+          font-weight: 650;
+        }
+
+        .rr-proof-classes {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+          margin-bottom: 22px;
+        }
+
+        .rr-proof-classes div {
+          padding: 12px;
+          border: 1px solid rgba(255,255,255,.09);
+          border-radius: 14px;
+          background: rgba(0,0,0,.34);
+        }
+
+        .rr-proof-classes span {
+          display: block;
+          color: rgba(255,255,255,.42);
+          font-size: 11px;
+          font-weight: 780;
+          text-transform: uppercase;
+          letter-spacing: .12em;
+        }
+
+        .rr-proof-classes b {
+          display: block;
+          margin-top: 8px;
+          color: #fff;
+          font-size: 26px;
+          line-height: 1;
+        }
+
+        .rr-proof-signals {
+          display: grid;
+          gap: 10px;
+          margin-bottom: 18px;
+        }
+
+        .rr-proof-signals > span {
+          color: rgba(255,255,255,.34);
+          font-size: 11px;
+          font-weight: 850;
+          letter-spacing: .2em;
+          text-transform: uppercase;
+        }
+
+        .rr-proof-signals div {
+          display: flex;
+          gap: 7px;
+          flex-wrap: wrap;
+        }
+
+        .rr-proof-signals p {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 32px;
+          margin: 0;
+          padding: 0 10px;
+          border: 1px solid rgba(255,59,48,.2);
+          border-radius: 999px;
+          background: rgba(255,59,48,.065);
+        }
+
+        .rr-proof-signals b {
+          color: rgba(255,255,255,.78);
+          font-size: 12px;
+          text-transform: capitalize;
+        }
+
+        .rr-proof-signals em {
+          color: #ff4a40;
+          font-size: 12px;
+          font-style: normal;
+          font-weight: 850;
+        }
+
+        .rr-proof-data small {
+          display: block;
+          color: rgba(255,255,255,.32);
+          font-size: 11px;
+          line-height: 1.55;
+        }
+
         .rr-section {
           position: relative;
           z-index: 4;
@@ -2138,7 +2798,8 @@ export default function LandingPage({
           .rr-workflow,
           .rr-intelligence-band,
           .rr-trust,
-          .rr-section-head {
+          .rr-section-head,
+          .rr-proof-section {
             grid-template-columns: 1fr;
           }
 
@@ -2278,6 +2939,15 @@ export default function LandingPage({
             padding: 82px 0;
           }
 
+          .rr-proof-section {
+            width: min(100% - 36px, 1256px);
+            padding: 82px 0 70px;
+          }
+
+          .rr-proof-classes {
+            grid-template-columns: 1fr;
+          }
+
           .rr-section-head {
             margin-bottom: 32px;
           }
@@ -2363,6 +3033,11 @@ export default function LandingPage({
           0%, 58% { transform: translateX(0) skewX(-18deg); opacity: 0; }
           68% { opacity: .85; }
           100% { transform: translateX(520%) skewX(-18deg); opacity: 0; }
+        }
+
+        @keyframes rrOrganismFloat {
+          0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: .78; }
+          50% { transform: translate3d(8px, -10px, 0) scale(1.04); opacity: 1; }
         }
 
         @keyframes rrEarthriseDrift {
