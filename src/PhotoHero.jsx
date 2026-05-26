@@ -76,7 +76,8 @@ export default function PhotoHero({
   const glow = categoryGlow[category] || categoryGlow.food;
 
   const photos = useMemo(() => {
-    return resolveAllPhotos(query || category, category);
+      if (!query.trim()) return [];
+      return resolveAllPhotos(query, category);
   }, [query, category]);
 
   useEffect(() => {

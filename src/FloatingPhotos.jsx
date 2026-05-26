@@ -1,162 +1,71 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { resolveAllPhotos, preloadPhoto, categoryGlow } from "./photoMap.js";
 
-/* ═══════════════════════════════════════════════════════════════════════════════
-   FLOATING PHOTOS BACKGROUND
-   
-   Multiple product photos float, slowly drift, rotate, and scale
-   behind translucent glass result cards. Creates depth and premium feel.
-   Photos crossfade in and out on a staggered loop.
-   ═══════════════════════════════════════════════════════════════════════════════ */
-
-// Random float in range
 const rand = (min, max) => Math.random() * (max - min) + min;
 
-// Generate random initial positions for floating photos
-function generateSlots(count) {
-  return Array.from({ length: count }, (_, i) => ({
-    id: i,
-    x: rand(5, 85),         // % from left
-    y: rand(5, 80),         // % from top
-    scale: rand(0.55, 0.9),
-    rotation: rand(-12, 12), // degrees
-    delay: rand(0, 4),       // animation delay
-    duration: rand(18, 30),  // drift cycle duration
-    driftX: rand(-6, 6),     // how far to drift horizontally
-    driftY: rand(-4, 4),     // how far to drift vertically
-    opacity: rand(0.06, 0.14),
-  }));
+function generateSlots() {
+  const left = [
+    { x: -4, y: 8,   w: 150, h: 110, rot: -7, op: 0.09, dur: 22, del: 0 },
+    { x: 2,  y: 32,  w: 120, h: 90,  rot: 5,  op: 0.07, dur: 26, del: 1.5 },
+    { x: -2, y: 58,  w: 130, h: 95,  rot: -4, op: 0.06, dur: 20, del: 3 },
+  ];
+  const right = [
+    { x: 82, y: 12,  w: 140, h: 100, rot: 6,  op: 0.08, dur: 24, del: 0.8 },
+    { x: 86, y: 40,  w: 110, h: 80,  rot: -5, op: 0.06, dur: 28, del: 2 },
+    { x: 80, y: 65,  w: 125, h: 90,  rot: 3,  op: 0.05, dur: 21, del: 3.5 },
+  ];
+  return [...left, ...right].map((s, i) => ({ ...s, id: i }));
 }
 
-export default function FloatingPhotos({
-  query = "",
-  category = "food",
-  visible = false,
-}) {
-  const [photos, setPhotos] = useState([]);
+export default function FloatingPhotos({ query = "", category = "food", visible = false }) {
   const [loaded, setLoaded] = useState([]);
-  const slots = useMemo(() => generateSlots(5), []);
+  const slots = useMemo(() => generateSlots(), []);
   const glow = categoryGlow[category] || categoryGlow.food;
 
-  // Load photos when query changes
   useEffect(() => {
-    if (!visible || !query.trim()) {
-      setPhotos([]);
-      setLoaded([]);
-      return;
-    }
-
-    const allPhotos = resolveAllPhotos(query, category);
-    // Take up to 5 photos, repeat if needed
+    if (!visible || !query.trim()) { setLoaded([]); return; }
+    const all = resolveAllPhotos(query, category);
     const expanded = [];
-    for (let i = 0; i < 5; i++) {
-      expanded.push(allPhotos[i % allPhotos.length]);
-    }
-
-    // Preload all
-    Promise.all(expanded.map((src) => preloadPhoto(src))).then((results) => {
-      setPhotos(expanded);
-      setLoaded(results.filter(Boolean));
-    });
+    for (let i = 0; i < 6; i++) expanded.push(all[i % all.length]);
+    Promise.all(expanded.map(preloadPhoto)).then((r) => setLoaded(r.filter(Boolean)));
   }, [query, category, visible]);
 
   if (!visible || loaded.length === 0) return null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 0,
-        pointerEvents: "none",
-        overflow: "hidden",
-      }}
-    >
-      {/* Dark base so photos don't make text unreadable */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "radial-gradient(ellipse at top, #10080c 0%, #0a0c14 30%, #060608 100%)",
-          zIndex: 0,
-        }}
-      />
-
-      {/* Category ambient glow */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: glow.bg,
-          opacity: 0.7,
-          zIndex: 1,
-        }}
-      />
-
-      {/* Floating photos */}
-      {slots.map((slot, i) => {
+    <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden" }}>
+      {slots.map((s, i) => {
         const src = loaded[i % loaded.length];
         if (!src) return null;
-
         return (
           <div
-            key={slot.id}
+            key={s.id}
             style={{
               position: "absolute",
-              left: `${slot.x}%`,
-              top: `${slot.y}%`,
-              width: "clamp(180px, 22vw, 320px)",
-              height: "clamp(130px, 16vw, 230px)",
-              borderRadius: "18px",
+              left: `${s.x}%`,
+              top: `${s.y}%`,
+              width: `${s.w}px`,
+              height: `${s.h}px`,
+              borderRadius: "14px",
               overflow: "hidden",
-              opacity: slot.opacity,
-              transform: `scale(${slot.scale}) rotate(${slot.rotation}deg)`,
-              animation: `floatDrift${i} ${slot.duration}s ease-in-out ${slot.delay}s infinite alternate`,
-              zIndex: 2,
-              filter: "blur(1px) saturate(0.7)",
+              opacity: s.op,
+              transform: `rotate(${s.rot}deg)`,
+              animation: `floatSide${i} ${s.dur}s ease-in-out ${s.del}s infinite alternate`,
+              filter: "blur(1.5px) saturate(0.6)",
             }}
           >
-            <img
-              src={src}
-              alt=""
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                display: "block",
-              }}
-            />
+            <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           </div>
         );
       })}
-
-      {/* Overlay to ensure text readability */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: `
-            linear-gradient(to bottom, rgba(6,6,8,0.75) 0%, rgba(6,6,8,0.55) 30%, rgba(6,6,8,0.65) 70%, rgba(6,6,8,0.9) 100%)
-          `,
-          zIndex: 3,
-        }}
-      />
-
-      {/* Unique keyframes for each floating photo */}
       <style>{`
-        ${slots.map((slot, i) => `
-          @keyframes floatDrift${i} {
-            0% {
-              transform: scale(${slot.scale}) rotate(${slot.rotation}deg) translate(0px, 0px);
-            }
-            50% {
-              transform: scale(${slot.scale * 1.05}) rotate(${slot.rotation + rand(-3, 3)}deg) translate(${slot.driftX}px, ${slot.driftY}px);
-            }
-            100% {
-              transform: scale(${slot.scale}) rotate(${slot.rotation - rand(-2, 2)}deg) translate(${-slot.driftX * 0.5}px, ${-slot.driftY * 0.5}px);
-            }
+        ${slots.map((s, i) => `
+          @keyframes floatSide${i} {
+            0%   { transform: rotate(${s.rot}deg) translate(0px, 0px); }
+            50%  { transform: rotate(${s.rot + rand(-2,2)}deg) translate(${rand(-4,4)}px, ${rand(-6,6)}px); }
+            100% { transform: rotate(${s.rot - rand(-1,1)}deg) translate(${rand(-3,3)}px, ${rand(-5,5)}px); }
           }
-        `).join("\n")}
+        `).join("")}
       `}</style>
     </div>
   );
