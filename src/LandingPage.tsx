@@ -1,131 +1,479 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
 import * as THREE from "three";
+import RecallRadarLogo from "./RecallRadarLogo";
 
 type Category = "food" | "drug" | "device" | "consumer";
 
-// ─── 3D GLOBE ──────────────────────────────────────────────────────────────────
+function Logo() {
+  return (
+    <a className="rr-logo" href="#" aria-label="RecallRadar home">
+      <RecallRadarLogo className="rr-mark" />
+    </a>
+  );
+}
 
-function GlobalOrb() {
-  const sphereRef = useRef<THREE.Mesh>(null);
-  const wireRef = useRef<THREE.Mesh>(null);
-  const ring1Ref = useRef<THREE.Mesh>(null);
-  const ring2Ref = useRef<THREE.Mesh>(null);
+function RadarReticle({ compact = false }: { compact?: boolean }) {
+  return (
+    <svg className={compact ? "rr-reticle rr-reticle--compact" : "rr-reticle"} viewBox="0 0 72 72" fill="none" aria-hidden="true">
+      <circle cx="36" cy="36" r="30" stroke="#fff" strokeOpacity=".16" />
+      <circle cx="36" cy="36" r="19" stroke="#fff" strokeOpacity=".2" strokeDasharray="3 5" />
+      <circle cx="36" cy="36" r="9" stroke="#fff" strokeOpacity=".34" />
+      <path d="M36 5V15M36 57V67M5 36H15M57 36H67" stroke="#fff" strokeOpacity=".28" strokeLinecap="round" />
+      <circle cx="36" cy="36" r="3" fill="#fff" />
+      <circle cx="36" cy="36" r="1.5" fill="#ff372f" />
+      <circle cx="53" cy="21" r="3" fill="#ff372f" />
+    </svg>
+  );
+}
+
+function HorizonGrid() {
+  const dots = useMemo(() => {
+    const result: { x: number; z: number; s: number; o: number }[] = [];
+    for (let ring = 1; ring <= 16; ring += 1) {
+      const count = 18 + ring * 8;
+      const radius = ring * 0.48;
+      for (let i = 0; i < count; i += 1) {
+        if (i % 3 === 0 && ring < 8) continue;
+        const angle = (i / count) * Math.PI * 2;
+        result.push({
+          x: Math.cos(angle) * radius,
+          z: Math.sin(angle) * radius,
+          s: ring % 4 === 0 ? 0.018 : 0.011,
+          o: Math.max(0.08, 0.42 - ring * 0.018),
+        });
+      }
+    }
+    return result;
+  }, []);
+
+  return (
+    <group position={[1.45, -2.35, -1.4]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh>
+        <circleGeometry args={[8.5, 160]} />
+        <meshBasicMaterial color="#161214" transparent opacity={0.42} />
+      </mesh>
+      {[1.6, 2.65, 3.8, 5.1, 6.6].map((radius) => (
+        <mesh key={radius}>
+          <ringGeometry args={[radius, radius + 0.012, 180]} />
+          <meshBasicMaterial color="#ff3b30" transparent opacity={radius < 3 ? 0.13 : 0.07} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+      {Array.from({ length: 18 }).map((_, index) => (
+        <mesh key={index} rotation={[0, 0, (index / 18) * Math.PI]}>
+          <planeGeometry args={[0.01, 13.6]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.028} />
+        </mesh>
+      ))}
+      {dots.map((dot, index) => (
+        <mesh key={index} position={[dot.x, dot.z, 0.018]}>
+          <circleGeometry args={[dot.s, 8]} />
+          <meshBasicMaterial color={index % 5 === 0 ? "#ffffff" : "#ff3b30"} transparent opacity={dot.o} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function SentinelOrb() {
+  const orb = useRef<THREE.Group>(null);
+  const ringA = useRef<THREE.Mesh>(null);
+  const ringB = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    if (sphereRef.current) sphereRef.current.rotation.y = t * 0.045;
-    if (wireRef.current) wireRef.current.rotation.y = t * 0.045;
-    if (ring1Ref.current) ring1Ref.current.rotation.z = t * 0.07;
-    if (ring2Ref.current) ring2Ref.current.rotation.x = t * -0.05;
+    if (orb.current) orb.current.rotation.y = t * 0.055;
+    if (ringA.current) ringA.current.rotation.z = t * 0.035;
+    if (ringB.current) ringB.current.rotation.x = t * -0.028;
   });
 
   return (
-    <group>
-      <mesh ref={sphereRef}>
-        <sphereGeometry args={[2.2, 64, 64]} />
-        <meshStandardMaterial color="#0e0e0e" metalness={0.96} roughness={0.07} />
+    <group position={[1.35, 0.18, -0.35]}>
+      <group ref={orb}>
+        <mesh>
+          <sphereGeometry args={[1.88, 96, 96]} />
+          <meshStandardMaterial color="#08080a" metalness={0.98} roughness={0.12} />
+        </mesh>
+        <mesh>
+          <sphereGeometry args={[1.895, 28, 28]} />
+          <meshBasicMaterial color="#6b6269" wireframe transparent opacity={0.18} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[1.89, 0.018, 12, 180]} />
+          <meshBasicMaterial color="#ff3028" transparent opacity={0.95} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[1.89, 0.115, 16, 180]} />
+          <meshBasicMaterial color="#ff3028" transparent opacity={0.12} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[1.9, 0.33, 16, 180]} />
+          <meshBasicMaterial color="#ff3028" transparent opacity={0.035} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[1.14, 1.148, 160]} />
+          <meshBasicMaterial color="#ff3028" transparent opacity={0.38} side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+      <mesh ref={ringA} rotation={[0.68, 0.12, -0.42]}>
+        <ringGeometry args={[2.08, 2.1, 180]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.18} side={THREE.DoubleSide} />
       </mesh>
-      <mesh ref={wireRef}>
-        <sphereGeometry args={[2.26, 22, 22]} />
-        <meshBasicMaterial color="#282828" wireframe transparent opacity={0.2} />
+      <mesh ref={ringB} rotation={[1.2, 0.72, 0.05]}>
+        <ringGeometry args={[2.25, 2.265, 180]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.1} side={THREE.DoubleSide} />
       </mesh>
-      {/* Equatorial glow — wide bloom */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[2.22, 0.26, 16, 128]} />
-        <meshBasicMaterial color="#ff3b30" transparent opacity={0.06} side={2} />
+      <mesh position={[0, -0.02, 1.89]}>
+        <circleGeometry args={[0.065, 32]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.95} />
       </mesh>
-      {/* Equatorial glow — core band */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[2.22, 0.065, 16, 128]} />
-        <meshBasicMaterial color="#ff3b30" transparent opacity={0.32} side={2} />
-      </mesh>
-      {/* Equatorial glow — sharp edge */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[2.22, 0.011, 16, 128]} />
-        <meshBasicMaterial color="#ff6050" transparent opacity={0.94} side={2} />
-      </mesh>
-      {/* Orbit ring 1 */}
-      <mesh ref={ring1Ref} rotation={[Math.PI / 5, 0, Math.PI / 7]}>
-        <ringGeometry args={[2.66, 2.695, 128]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.1} side={2} />
-      </mesh>
-      {/* Orbit ring 2 */}
-      <mesh ref={ring2Ref} rotation={[Math.PI / 2.8, Math.PI / 5, 0]}>
-        <ringGeometry args={[2.88, 2.91, 128]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.07} side={2} />
+      <mesh position={[0, -0.02, 1.895]} scale={[5, 0.42, 1]}>
+        <circleGeometry args={[0.28, 64]} />
+        <meshBasicMaterial color="#ff3028" transparent opacity={0.55} />
       </mesh>
     </group>
   );
 }
 
-function GlobeCanvas() {
+function HeroScene() {
   return (
-    <Canvas
-      camera={{ position: [0, 0.8, 7.5], fov: 38 }}
-      style={{ position: "absolute", inset: 0, background: "transparent" }}
-    >
+    <Canvas camera={{ position: [0, 0.46, 7.2], fov: 38 }} dpr={[1, 1.7]} className="rr-scene">
       <Suspense fallback={null}>
-        <ambientLight intensity={0.06} />
-        <pointLight position={[0, -3.5, 4.5]} color="#ff3b30" intensity={2.8} />
-        <pointLight position={[5, 2, -4]} color="#ffffff" intensity={0.35} />
-        <pointLight position={[-2, 5, 2]} color="#8888ff" intensity={0.1} />
-        <GlobalOrb />
-        <Stars radius={90} depth={50} count={300} factor={1.4} fade />
+        <color attach="background" args={["#000"]} />
+        <ambientLight intensity={0.08} />
+        <pointLight position={[1.45, -0.18, 2.3]} color="#ff342c" intensity={8.5} distance={8} />
+        <pointLight position={[4.2, 2.4, 3.4]} color="#fff5f5" intensity={1.35} distance={10} />
+        <pointLight position={[-2.5, -1.6, 2]} color="#ff493d" intensity={1.1} distance={8} />
+        <Stars radius={70} depth={40} count={320} factor={1.1} fade speed={0.12} />
+        <SentinelOrb />
+        <HorizonGrid />
       </Suspense>
     </Canvas>
   );
 }
 
-// ─── SHARED HORIZON LOGO ───────────────────────────────────────────────────────
+function HorizonInstallation() {
+  const group = useRef<THREE.Group>(null);
+  const globe = useRef<THREE.Group>(null);
+  const flare = useRef<THREE.Group>(null);
+  const orbitA = useRef<THREE.Mesh>(null);
+  const orbitB = useRef<THREE.Mesh>(null);
+  const sourceDots = useRef<THREE.Group>(null);
 
-function HorizonLogo() {
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    if (group.current) {
+      group.current.rotation.y = Math.sin(t * 0.18) * 0.08;
+      group.current.position.y = Math.sin(t * 0.28) * 0.045;
+    }
+    if (globe.current) {
+      globe.current.rotation.y = t * 0.13;
+      globe.current.rotation.x = Math.sin(t * 0.24) * 0.035;
+    }
+    if (flare.current) {
+      const s = 1 + Math.sin(t * 2.5) * 0.12;
+      flare.current.scale.setScalar(s);
+    }
+    if (orbitA.current) orbitA.current.rotation.z = t * 0.16;
+    if (orbitB.current) orbitB.current.rotation.x = t * -0.12;
+    if (sourceDots.current) sourceDots.current.rotation.z = t * 0.34;
+  });
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer", gap: 0 }}>
-      <svg width="88" height="44" viewBox="0 0 100 50" fill="none" style={{ overflow: "visible" }}>
-        <defs>
-          <filter id="lpArcGlow" x="-20%" y="-80%" width="140%" height="260%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2.8" result="blur" />
-          </filter>
-          <filter id="lpFlareAtmos" x="-300%" y="-300%" width="700%" height="700%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
-          </filter>
-          <filter id="lpFlareMid" x="-200%" y="-200%" width="500%" height="500%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
-          </filter>
-          <linearGradient id="lpArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#ff3b30" stopOpacity="0" />
-            <stop offset="22%" stopColor="#ff3b30" stopOpacity="0.65" />
-            <stop offset="50%" stopColor="#ff5540" stopOpacity="1" />
-            <stop offset="78%" stopColor="#ff3b30" stopOpacity="0.65" />
-            <stop offset="100%" stopColor="#ff3b30" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d="M4 47 Q50 7 96 47" stroke="#ff3b30" strokeWidth="6" fill="none" strokeLinecap="round" filter="url(#lpArcGlow)" opacity="0.35" />
-        <path d="M8 47 Q50 9 92 47" stroke="#ff4433" strokeWidth="2" fill="none" strokeLinecap="round" filter="url(#lpArcGlow)" opacity="0.5" />
-        <path d="M10 47 Q50 11 90 47" stroke="url(#lpArcGrad)" strokeWidth="0.9" fill="none" strokeLinecap="round" />
-        <circle cx="50" cy="11" r="14" fill="#cc2010" opacity="0.14" filter="url(#lpFlareAtmos)" />
-        <circle cx="50" cy="11" r="6" fill="#ff3020" opacity="0.28" filter="url(#lpFlareMid)" />
-        <circle cx="50" cy="11" r="3" fill="#ff4433" opacity="0.7" filter="url(#lpFlareMid)" />
-        <circle cx="50" cy="11" r="2" fill="#ff6655" opacity="0.92" />
-        <circle cx="50" cy="11" r="0.85" fill="white" opacity="0.97" />
-        <path d="M50 9 L50 -4" stroke="white" strokeWidth="0.75" strokeLinecap="round" opacity="0.72" />
-        <path d="M49.2 9.5 L44.5 3.5" stroke="#ffaa90" strokeWidth="0.55" strokeLinecap="round" opacity="0.48" />
-        <path d="M50.8 9.5 L55.5 3.5" stroke="#ffaa90" strokeWidth="0.55" strokeLinecap="round" opacity="0.48" />
-        <path d="M47.5 11 L43 11" stroke="#ff6040" strokeWidth="0.4" strokeLinecap="round" opacity="0.32" />
-        <path d="M52.5 11 L57 11" stroke="#ff6040" strokeWidth="0.4" strokeLinecap="round" opacity="0.32" />
-      </svg>
-      <span style={{ fontFamily: "'Josefin Sans', 'Futura', system-ui, sans-serif", fontSize: "0.75rem", fontWeight: 300, letterSpacing: "0.32em", color: "#fff", marginTop: "2px", lineHeight: 1, whiteSpace: "nowrap" }}>
-        RECALL<span style={{ color: "#ff3b30" }}>RADAR</span>
-      </span>
-      <div style={{ height: "1px", background: "linear-gradient(90deg, transparent, #ff3b30 30%, #ff3b30 70%, transparent)", width: "94%", marginTop: "5px" }} />
-    </div>
+    <group ref={group} position={[0, -0.1, 0]}>
+      <group ref={globe}>
+        <mesh>
+          <sphereGeometry args={[1.58, 96, 96]} />
+          <meshStandardMaterial color="#030304" metalness={0.95} roughness={0.18} />
+        </mesh>
+        <mesh>
+          <sphereGeometry args={[1.595, 30, 30]} />
+          <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.08} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[1.59, 0.02, 12, 190]} />
+          <meshBasicMaterial color="#ff3b30" transparent opacity={0.92} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[1.59, 0.14, 16, 190]} />
+          <meshBasicMaterial color="#ff3b30" transparent opacity={0.1} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[1.59, 0.38, 16, 190]} />
+          <meshBasicMaterial color="#ff3b30" transparent opacity={0.035} />
+        </mesh>
+      </group>
+
+      <mesh ref={orbitA} rotation={[0.88, 0.12, -0.26]}>
+        <ringGeometry args={[1.9, 1.915, 190]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.14} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh ref={orbitB} rotation={[1.28, -0.42, 0.2]}>
+        <ringGeometry args={[2.13, 2.145, 190]} />
+        <meshBasicMaterial color="#ff3b30" transparent opacity={0.08} side={THREE.DoubleSide} />
+      </mesh>
+
+      <group ref={sourceDots} rotation={[0, 0, 0]}>
+        {[0, Math.PI * 0.66, Math.PI * 1.32].map((angle, index) => (
+          <group key={angle} position={[Math.cos(angle) * 1.9, Math.sin(angle) * 1.9, 0.12]}>
+            <mesh>
+              <sphereGeometry args={[index === 0 ? 0.06 : 0.045, 24, 24]} />
+              <meshBasicMaterial color={index === 0 ? "#ffffff" : "#ff3b30"} transparent opacity={0.95} />
+            </mesh>
+            <mesh scale={[3.4, 1, 1]}>
+              <sphereGeometry args={[0.08, 18, 18]} />
+              <meshBasicMaterial color="#ff3b30" transparent opacity={0.16} />
+            </mesh>
+          </group>
+        ))}
+      </group>
+
+      <group ref={flare} position={[0, 0, 1.6]}>
+        <mesh>
+          <sphereGeometry args={[0.08, 32, 32]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.98} />
+        </mesh>
+        <mesh scale={[6.2, 0.55, 1]}>
+          <sphereGeometry args={[0.18, 32, 32]} />
+          <meshBasicMaterial color="#ff3b30" transparent opacity={0.42} />
+        </mesh>
+        <mesh scale={[1.2, 1.2, 1]}>
+          <sphereGeometry args={[0.22, 32, 32]} />
+          <meshBasicMaterial color="#ff3b30" transparent opacity={0.16} />
+        </mesh>
+      </group>
+
+      <mesh position={[0, 0.78, 1.58]}>
+        <planeGeometry args={[0.012, 1.5]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.42} />
+      </mesh>
+    </group>
   );
 }
 
-// ─── LANDING PAGE ──────────────────────────────────────────────────────────────
+function HorizonCanvas() {
+  return (
+    <Canvas camera={{ position: [0, 0.05, 5.4], fov: 42 }} dpr={[1, 1.6]} className="rr-horizon-canvas">
+      <Suspense fallback={null}>
+        <ambientLight intensity={0.12} />
+        <pointLight position={[0, 0.3, 2.6]} color="#ff3b30" intensity={2.4} distance={6} />
+        <pointLight position={[1.8, 1.2, 2.2]} color="#ffffff" intensity={0.6} distance={5} />
+        <HorizonInstallation />
+      </Suspense>
+    </Canvas>
+  );
+}
+
+function IntelligenceOrb() {
+  const group = useRef<THREE.Group>(null);
+  const scan = useRef<THREE.Mesh>(null);
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    if (group.current) {
+      group.current.rotation.y = t * 0.16;
+      group.current.rotation.x = Math.sin(t * 0.35) * 0.08;
+    }
+    if (scan.current) scan.current.rotation.z = t * 0.55;
+  });
+
+  return (
+    <group ref={group}>
+      <mesh>
+        <sphereGeometry args={[1.08, 64, 64]} />
+        <meshStandardMaterial color="#09090a" metalness={0.92} roughness={0.18} />
+      </mesh>
+      <mesh>
+        <sphereGeometry args={[1.095, 18, 18]} />
+        <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.1} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.1, 0.018, 12, 160]} />
+        <meshBasicMaterial color="#ff3b30" transparent opacity={0.75} />
+      </mesh>
+      <mesh ref={scan} rotation={[0.2, 0.5, 0]}>
+        <ringGeometry args={[1.32, 1.34, 160]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.16} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[0.25, -0.08, 1.08]} scale={[3.8, 0.42, 1]}>
+        <circleGeometry args={[0.13, 48]} />
+        <meshBasicMaterial color="#ff332c" transparent opacity={0.62} />
+      </mesh>
+    </group>
+  );
+}
+
+function IntelligenceCanvas() {
+  return (
+    <Canvas camera={{ position: [0, 0.1, 4.1], fov: 42 }} dpr={[1, 1.6]} className="rr-mini-canvas">
+      <Suspense fallback={null}>
+        <ambientLight intensity={0.1} />
+        <pointLight position={[1.8, 0.1, 2.4]} color="#ff3b30" intensity={4.2} distance={6} />
+        <pointLight position={[-2.6, 2.4, 2.5]} color="#ffffff" intensity={1.4} distance={7} />
+        <Stars radius={40} depth={18} count={120} factor={0.75} fade />
+        <IntelligenceOrb />
+      </Suspense>
+    </Canvas>
+  );
+}
+
+function PipelineScene() {
+  const group = useRef<THREE.Group>(null);
+  const pulse = useRef<THREE.Group>(null);
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    if (group.current) group.current.rotation.y = Math.sin(t * 0.35) * 0.1;
+    if (pulse.current) {
+      const x = ((t * 0.85) % 4.8) - 2.4;
+      pulse.current.position.x = x;
+      pulse.current.position.y = 0.08;
+    }
+  });
+
+  return (
+    <group ref={group} position={[0, -0.05, 0]}>
+      <mesh position={[0, 0.08, -0.03]}>
+        <planeGeometry args={[5.2, 0.018]} />
+        <meshBasicMaterial color="#ff3b30" transparent opacity={0.82} />
+      </mesh>
+      <mesh position={[0, 0.08, -0.04]}>
+        <planeGeometry args={[5.4, 0.22]} />
+        <meshBasicMaterial color="#ff3b30" transparent opacity={0.09} />
+      </mesh>
+      <mesh position={[0, 0.08, -0.05]}>
+        <planeGeometry args={[5.55, 0.62]} />
+        <meshBasicMaterial color="#ff3b30" transparent opacity={0.035} />
+      </mesh>
+      {[-2.4, 0, 2.4].map((x, index) => (
+        <group key={x} position={[x, 0.08, 0]}>
+          <mesh>
+            <sphereGeometry args={[0.15, 32, 32]} />
+            <meshStandardMaterial color="#101012" emissive="#2b0907" metalness={0.7} roughness={0.22} />
+          </mesh>
+          <mesh>
+            <ringGeometry args={[0.28, 0.295, 72]} />
+            <meshBasicMaterial color={index === 1 ? "#ffffff" : "#ff3b30"} transparent opacity={index === 1 ? 0.32 : 0.5} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh scale={index === 1 ? 1.4 : 1.1}>
+            <sphereGeometry args={[0.17, 24, 24]} />
+            <meshBasicMaterial color="#ff3b30" transparent opacity={index === 1 ? 0.1 : 0.07} />
+          </mesh>
+        </group>
+      ))}
+      <group ref={pulse} position={[-2.4, 0.02, 0.04]}>
+        <mesh>
+          <sphereGeometry args={[0.075, 32, 32]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.95} />
+        </mesh>
+        <mesh scale={[5.8, 1.2, 1]}>
+          <sphereGeometry args={[0.09, 32, 32]} />
+          <meshBasicMaterial color="#ff3b30" transparent opacity={0.28} />
+        </mesh>
+        <mesh scale={[13, 0.65, 1]}>
+          <sphereGeometry args={[0.055, 24, 24]} />
+          <meshBasicMaterial color="#ff3b30" transparent opacity={0.18} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+function PipelineCanvas() {
+  return (
+    <Canvas camera={{ position: [0, 0.35, 5.6], fov: 42 }} dpr={[1, 1.6]} className="rr-pipeline-canvas">
+      <Suspense fallback={null}>
+        <ambientLight intensity={0.16} />
+        <pointLight position={[0, 1.3, 2.8]} color="#ff3b30" intensity={3.5} distance={7} />
+        <pointLight position={[-2, 1.8, 2.2]} color="#ffffff" intensity={0.8} distance={6} />
+        <PipelineScene />
+      </Suspense>
+    </Canvas>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M5 15 15 5M8 5h7v7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function RadarLensButton({ label = "Search" }: { label?: string }) {
+  return (
+    <span className="rr-lens-button" aria-hidden="true">
+      <span className="rr-lens-core">
+        {Array.from({ length: 56 }).map((_, index) => (
+          <i key={index} style={{ transform: `rotate(${index * (360 / 56)}deg)` }} />
+        ))}
+        <b />
+      </span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function CategoryIcon({ name }: { name: string }) {
+  const common = { stroke: "currentColor", strokeWidth: 1.35, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  return (
+    <svg viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      {name === "food" && (
+        <>
+          <path d="M10.5 9.2c-4.6 1.6-4.2 8.6-.5 10.8 2.2 1.3 3.2-.3 4-.3s1.8 1.6 4 .3c3.7-2.2 4.1-9.2-.5-10.8-1.6-.6-2.8.2-3.5.9-.7-.7-1.9-1.5-3.5-.9Z" {...common} />
+          <path d="M14.2 9.8c.2-2.2 1.2-3.8 3.5-4.7" {...common} />
+          <path d="M10.6 5.9c1.3.1 2.4.9 3.1 2.1" {...common} />
+        </>
+      )}
+      {name === "drug" && (
+        <>
+          <rect x="5" y="12" width="18" height="8" rx="4" {...common} />
+          <path d="M14 12v8M8.2 6.8l2.6-2.6a3 3 0 0 1 4.2 4.2L12.4 11" {...common} />
+        </>
+      )}
+      {name === "device" && <path d="M4 14h4.5l2-5.5 4 11 2.4-7 2 3.5H24" {...common} />}
+      {name === "consumer" && (
+        <>
+          <path d="M7 11h14l-1.2 10H8.2L7 11Z" {...common} />
+          <path d="M10 11V8.5a4 4 0 0 1 8 0V11" {...common} />
+        </>
+      )}
+      {name === "vehicle" && (
+        <>
+          <path d="M5 14.5 7.6 10h12.8l2.6 4.5v5H5v-5Z" {...common} />
+          <path d="M7 15h14M9 19.5h.1M19 19.5h.1" {...common} />
+          <circle cx="9" cy="20" r="1.8" {...common} />
+          <circle cx="19" cy="20" r="1.8" {...common} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function FeatureIcon({ type }: { type: string }) {
+  if (type === "monitor") return <RecallRadarLogo compact className="rr-mark rr-mark--compact" />;
+  if (type === "detect") return <RadarReticle compact />;
+  return (
+    <svg className="rr-feature-svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      {type === "guide" && (
+        <>
+          <path d="M32 11 49 18v12c0 11-7.2 18.6-17 23-9.8-4.4-17-12-17-23V18l17-7Z" stroke="#fff" strokeOpacity=".22" />
+          <path d="m25 31 5 5 10-12" stroke="#ff3b30" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
+      {type === "trust" && (
+        <>
+          <circle cx="32" cy="32" r="21" stroke="#fff" strokeOpacity=".22" />
+          <path d="M44 22a16 16 0 0 1 3.5 10" stroke="#ff3b30" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="47.5" cy="32" r="3" fill="#ff3b30" />
+        </>
+      )}
+    </svg>
+  );
+}
 
 export default function LandingPage({
   onLaunch,
@@ -137,6 +485,10 @@ export default function LandingPage({
   const [email, setEmail] = useState("");
   const [joined, setJoined] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
+  const [heroQuery, setHeroQuery] = useState("");
+  const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
+  const [commandMode, setCommandMode] = useState<"search" | "monitor">("search");
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
   const joinWaitlist = async () => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -155,431 +507,1875 @@ export default function LandingPage({
     }
   };
 
-  const categories: { label: string; cat: Category; icon: React.ReactNode }[] = [
-    {
-      label: "Food",
-      cat: "food",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <path d="M10 2C10 2 5.5 5.5 5.5 10.5V15H14.5V10.5C14.5 5.5 10 2 10 2Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-          <path d="M7 8C8 7.5 12 7.5 13 8" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-        </svg>
-      ),
-    },
-    {
-      label: "Medicine",
-      cat: "drug",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <rect x="4" y="9" width="12" height="6" rx="3" stroke="currentColor" strokeWidth="1.2" />
-          <path d="M4 12H16" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-          <path d="M10 5V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-          <circle cx="10" cy="4.5" r="1.5" stroke="currentColor" strokeWidth="1" />
-        </svg>
-      ),
-    },
-    {
-      label: "Medical Devices",
-      cat: "device",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <path d="M2 10H5.5L7 6L10 14L12 9L13.5 11H18" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ),
-    },
-    {
-      label: "Consumer Products",
-      cat: "consumer",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <path d="M4.5 6H15.5L14 14H6L4.5 6Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-          <path d="M7 6V5C7 3.9 7.9 3 9 3H11C12.1 3 13 3.9 13 5V6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-          <circle cx="7.5" cy="16.5" r="1" fill="currentColor" />
-          <circle cx="12.5" cy="16.5" r="1" fill="currentColor" />
-        </svg>
-      ),
-    },
-    {
-      label: "Vehicles",
-      cat: "consumer",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <path d="M3 11L5.5 7H14.5L17 11V14.5H3V11Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-          <circle cx="6" cy="14.5" r="1.8" stroke="currentColor" strokeWidth="1.1" />
-          <circle cx="14" cy="14.5" r="1.8" stroke="currentColor" strokeWidth="1.1" />
-          <path d="M3 11H17" stroke="currentColor" strokeWidth="0.9" />
-          <path d="M7 7L6 11" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" />
-          <path d="M13 7L14 11" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" />
-        </svg>
-      ),
-    },
+  const categories: { label: string; cat: Category; icon: string; source: string; example: string }[] = [
+    { label: "Food", cat: "food", icon: "food", source: "FDA", example: "chicken" },
+    { label: "Medicine", cat: "drug", icon: "drug", source: "FDA", example: "ibuprofen" },
+    { label: "Medical Devices", cat: "device", icon: "device", source: "FDA", example: "syringe" },
+    { label: "Consumer Products", cat: "consumer", icon: "consumer", source: "CPSC", example: "air fryer" },
+    { label: "Vehicles", cat: "consumer", icon: "vehicle", source: "NHTSA", example: "2021 Toyota Camry" },
   ];
 
-  const features = [
-    {
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke="#ff3b30" strokeWidth="1.4" />
-          <circle cx="12" cy="12" r="5.5" stroke="#ff3b30" strokeWidth="1" strokeDasharray="2 2" />
-          <circle cx="12" cy="12" r="2.5" stroke="#ff3b30" strokeWidth="1.3" />
-          <circle cx="12" cy="12" r="0.8" fill="#ff3b30" />
-        </svg>
-      ),
-      title: "Instant Detection",
-      desc: "Scan a barcode or search any product — get live FDA recall status in under a second.",
-    },
-    {
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M3 12H7L9 6L12 18L14.5 10L16.5 14H21" stroke="#ff3b30" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ),
-      title: "AI Risk Analysis",
-      desc: "Understand severity at a glance — plain language explanations with actionable next steps.",
-    },
-    {
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M12 3C12 3 7 6.5 7 12V16.5L5 18H19L17 16.5V12C17 6.5 12 3 12 3Z" stroke="#ff3b30" strokeWidth="1.4" strokeLinejoin="round" />
-          <path d="M10 18C10 19.1 10.9 20 12 20C13.1 20 14 19.1 14 18" stroke="#ff3b30" strokeWidth="1.3" />
-          <circle cx="18" cy="6" r="3" fill="#ff3b30" opacity="0.9" />
-        </svg>
-      ),
-      title: "Proactive Alerts",
-      desc: "Get notified the moment a recall touches products in your household scan history.",
-    },
-    {
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke="#ff3b30" strokeWidth="1.4" />
-          <path d="M3 12H21" stroke="#ff3b30" strokeWidth="1" strokeDasharray="3 2" />
-          <path d="M12 3C9 6 7.5 9 7.5 12C7.5 15 9 18 12 21" stroke="#ff3b30" strokeWidth="1" />
-          <path d="M12 3C15 6 16.5 9 16.5 12C16.5 15 15 18 12 21" stroke="#ff3b30" strokeWidth="1" />
-        </svg>
-      ),
-      title: "Complete Coverage",
-      desc: "Food, drugs, medical devices, consumer products, and vehicles — one unified platform.",
-    },
+  const activeCategory = categories[activeCategoryIndex];
+  const commandExamples = categories.map((category) => category.example);
+  const commandPlaceholder = commandMode === "monitor"
+    ? `Save ${activeCategory.example} for recall alerts`
+    : `Search "${commandExamples[placeholderIndex]}"`;
+
+  useEffect(() => {
+    if (heroQuery.trim()) return;
+    const id = window.setInterval(() => {
+      setPlaceholderIndex((index) => (index + 1) % commandExamples.length);
+    }, 2400);
+    return () => window.clearInterval(id);
+  }, [commandExamples.length, heroQuery]);
+
+  const features: { title: string; body: string; icon: string | ReactNode }[] = [
+    { title: "Real-time monitoring", body: "We track recalls as they happen across official sources.", icon: "monitor" },
+    { title: "Intelligent detection", body: "AI-powered matching understands what you search, not just keywords.", icon: "detect" },
+    { title: "Actionable guidance", body: "Clear steps so you know exactly what to do.", icon: "guide" },
+    { title: "Built for trust", body: "Transparent, independent, and privacy-first by design.", icon: "trust" },
+  ];
+
+  const workflow = [
+    { step: "01", title: "Search anything you bring home", body: "Type a brand, product, ingredient, device, or vehicle. RecallRadar normalizes messy terms into official-source recall lookups." },
+    { step: "02", title: "Match against live safety signals", body: "The system compares FDA, CPSC, and vehicle recall data, then highlights the source, date, company, severity, and affected product details." },
+    { step: "03", title: "Know the next action", body: "Plain-language guidance turns recall records into practical steps: stop use, check lot codes, return, contact, repair, or monitor." },
+  ];
+
+  const intelligenceCards = [
+    ["FDA", "Food, medicine, and medical device enforcement recall data."],
+    ["CPSC", "Consumer product recalls for household goods, toys, appliances, and more."],
+    ["NHTSA", "Vehicle safety campaigns by year, make, model, component, and manufacturer."],
+    ["Household graph", "Saved products and vehicles become monitorable mobile safety signals."],
+  ];
+
+  const coverageStats = [
+    ["3", "official sources"],
+    ["5", "safety categories"],
+    ["24/7", "monitoring model"],
+  ];
+
+  const sourceSignals = [
+    { source: "FDA", scope: "Food • Drugs • Devices", count: "3", label: "categories" },
+    { source: "CPSC", scope: "Consumer Products", count: "1", label: "source" },
+    { source: "NHTSA", scope: "Vehicles", count: "1", label: "vehicle graph" },
   ];
 
   return (
-    <div style={{ background: "#000", color: "#fff", fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
+    <main className="rr-landing">
+      <div className="rr-bg">
+        <div className="rr-earthrise-bg" />
+        <div className="rr-space-vignette" />
+        <div className="rr-horizon" />
+      </div>
 
-      {/* ─── HERO ─────────────────────────────────────────────────────────────── */}
-      <div style={{ position: "relative", minHeight: "100vh", overflow: "hidden" }}>
-
-        {/* Globe — right side */}
-        <div style={{ position: "absolute", right: 0, top: 0, width: "65%", height: "100%", zIndex: 1 }}>
-          <GlobeCanvas />
-          {/* Blend left edge into black */}
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, #000 0%, rgba(0,0,0,0.5) 30%, transparent 60%)", zIndex: 2, pointerEvents: "none" }} />
-          {/* Blend bottom edge */}
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, #000 0%, transparent 28%)", zIndex: 2, pointerEvents: "none" }} />
-        </div>
-
-        {/* SYSTEM ONLINE panel */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 1.0, duration: 0.55 }}
-          style={{
-            position: "absolute",
-            right: "clamp(20px, 4vw, 56px)",
-            top: "clamp(90px, 14%, 140px)",
-            zIndex: 10,
-            background: "rgba(8, 8, 8, 0.72)",
-            backdropFilter: "blur(20px)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "16px",
-            padding: "18px 22px",
-            minWidth: "210px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
-            <div style={{ width: "7px", height: "7px", borderRadius: "999px", background: "#34c759", boxShadow: "0 0 8px #34c759" }} />
-            <span style={{ fontSize: "0.67rem", fontWeight: 700, letterSpacing: "0.14em", color: "rgba(255,255,255,0.62)" }}>SYSTEM ONLINE</span>
-          </div>
-          <div style={{ display: "grid", gap: "9px" }}>
-            {([
-              ["FDA Feed", "Active"],
-              ["Recalls Indexed", "14,283"],
-              ["Last Sync", "2m ago"],
-              ["Coverage", "98.4%"],
-            ] as [string, string][]).map(([label, value]) => (
-              <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "24px" }}>
-                <span style={{ fontSize: "0.66rem", color: "rgba(255,255,255,0.32)", letterSpacing: "0.05em" }}>{label}</span>
-                <span style={{ fontSize: "0.66rem", color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>{value}</span>
-              </div>
+      <div className="rr-hero-stage">
+        <header className="rr-nav">
+          <Logo />
+          <nav className="rr-links" aria-label="Primary navigation">
+            {["How it works", "Categories", "Intelligence", "About"].map((item) => (
+              <a href={`#${item.toLowerCase().replaceAll(" ", "-")}`} key={item}>
+                {item}
+              </a>
             ))}
-          </div>
-          <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-            <span style={{ fontSize: "0.63rem", color: "rgba(255,255,255,0.2)", letterSpacing: "0.08em" }}>MONITORING ACTIVE</span>
-          </div>
-        </motion.div>
-
-        {/* Nav + hero text */}
-        <div style={{
-          position: "relative", zIndex: 10,
-          maxWidth: "1200px", margin: "0 auto",
-          padding: "0 clamp(20px, 4vw, 48px)",
-          minHeight: "100vh", display: "flex", flexDirection: "column",
-        }}>
-
-          {/* NAV */}
-          <nav style={{
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-            padding: "28px 0", flexShrink: 0,
-          }}>
-            <HorizonLogo />
-            <div style={{ display: "flex", gap: "32px" }}>
-              {["How it works", "Categories", "Intelligence", "About"].map((item) => (
-                <span
-                  key={item}
-                  style={{ fontSize: "0.88rem", color: "rgba(255,255,255,0.52)", cursor: "pointer" }}
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-              <button
-                onClick={onLaunch}
-                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: "0.88rem", cursor: "pointer", fontFamily: "inherit", padding: 0 }}
-              >
-                Sign in
-              </button>
-              <button
-                onClick={() => setShowEmail((v) => !v)}
-                style={{ background: "#ff3b30", color: "#fff", border: "none", borderRadius: "999px", padding: "10px 22px", fontSize: "0.86rem", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-              >
-                Join early access ↗
-              </button>
-            </div>
           </nav>
+          <div className="rr-actions">
+            <button className="rr-signin" onClick={onLaunch}>Sign in</button>
+            <button className="rr-outline" onClick={() => setShowEmail((value) => !value)}>
+              Join early access <ArrowIcon />
+            </button>
+          </div>
+        </header>
 
-          {/* Hero text */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: "560px", paddingBottom: "110px" }}>
+        <section className="rr-hero" aria-labelledby="recallradar-title">
+          <motion.div className="rr-copy" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
+            <p className="rr-kicker">KNOW BEFORE IT HURTS YOU.</p>
+            <h1 id="recallradar-title">
+              Real-time recall
+              <br />
+              intelligence.
+              <br />
+              <span>For everything</span>
+              <br />
+              <span>you bring home.</span>
+            </h1>
+            <p className="rr-body">
+              RecallRadar monitors food, medicine, medical devices, consumer products, and vehicles - so you can protect what matters most.
+            </p>
 
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              style={{ color: "rgba(255,255,255,0.28)", fontSize: "0.74rem", fontWeight: 600, letterSpacing: "0.22em", marginBottom: "30px" }}
-            >
-              PROTECTING WHAT MATTERS
-            </motion.p>
+            <div className="rr-command-deck">
+              <div className="rr-command-topline">
+                <span>RECALL COMMAND</span>
+                <div className="rr-mode-toggle" aria-label="Command mode">
+                  {(["search", "monitor"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      className={commandMode === mode ? "is-active" : ""}
+                      onClick={() => setCommandMode(mode)}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+                <strong>{activeCategory.source} READY</strong>
+              </div>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 22 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.1 }}
-              style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "clamp(2.8rem, 5vw, 5.2rem)",
-                lineHeight: 1.0,
-                letterSpacing: "-0.04em",
-                fontWeight: 400,
-                marginBottom: "30px",
-                color: "#fff",
-              }}
-            >
-              Real-time recall<br />intelligence.<br />
-              <span style={{ color: "#ff3b30" }}>For everything<br />you bring home.</span>
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.22 }}
-              style={{ color: "rgba(255,255,255,0.4)", fontSize: "1rem", lineHeight: 1.72, maxWidth: "400px", marginBottom: "44px" }}
-            >
-              Scan any product, search by name — know instantly if it's been recalled, why, and exactly what to do about it.
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.34 }}
-              style={{ display: "flex", flexDirection: "column", gap: "14px", alignItems: "flex-start" }}
-            >
-              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                <button
-                  onClick={onLaunch}
-                  style={{ background: "#fff", color: "#000", border: "none", borderRadius: "12px", padding: "15px 30px", fontSize: "0.94rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-                >
-                  Search recalls →
-                </button>
-                <button
-                  onClick={() => setShowEmail((v) => !v)}
-                  style={{ background: "transparent", color: "rgba(255,255,255,0.48)", border: "1px solid rgba(255,255,255,0.13)", borderRadius: "12px", padding: "15px 24px", fontSize: "0.94rem", cursor: "pointer", fontFamily: "inherit" }}
-                >
-                  Join early access
+              <div className="rr-search-shell">
+                <div className="rr-search-lens" aria-hidden="true">
+                  <RadarLensButton label="" />
+                </div>
+                <input
+                  value={heroQuery}
+                  onChange={(event) => setHeroQuery(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && onLaunch()}
+                  placeholder={commandPlaceholder}
+                  aria-label="Search recalls"
+                />
+                <button className="rr-search-action" onClick={onLaunch}>
+                  <span>{commandMode === "monitor" ? "Join monitoring" : "Explore intelligence"}</span>
+                  <ArrowIcon />
                 </button>
               </div>
 
-              <AnimatePresence>
-                {showEmail && !joined && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    style={{ display: "flex", gap: "8px", width: "100%", maxWidth: "380px" }}
+              <div className="rr-command-examples" aria-label="Example recall searches">
+                <span>Try</span>
+                {commandExamples.map((example, index) => (
+                  <button
+                    key={example}
+                    className={activeCategoryIndex === index ? "is-active" : ""}
+                    onClick={() => {
+                      setActiveCategoryIndex(index);
+                      setPlaceholderIndex(index);
+                      setHeroQuery(example);
+                    }}
                   >
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && joinWaitlist()}
-                      placeholder="your@email.com"
-                      style={{
-                        flex: 1, padding: "13px 16px", borderRadius: "10px",
-                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-                        color: "#fff", outline: "none", fontSize: "0.9rem", fontFamily: "inherit",
-                      }}
-                    />
-                    <button
-                      onClick={joinWaitlist}
-                      style={{ background: "#ff3b30", color: "#fff", border: "none", borderRadius: "10px", padding: "13px 20px", cursor: "pointer", fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap" }}
-                    >
-                      Join →
-                    </button>
-                  </motion.div>
-                )}
-                {joined && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    style={{ color: "#34c759", fontSize: "0.88rem", margin: 0 }}
-                  >
-                    You're on the list. We'll be in touch.
-                  </motion.p>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          </div>
-        </div>
-      </div>
+                    {example}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-      {/* ─── CATEGORY BAR ─────────────────────────────────────────────────────── */}
-      <div style={{
-        borderTop: "1px solid rgba(255,255,255,0.06)",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        background: "rgba(255,255,255,0.012)",
-      }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 clamp(20px, 4vw, 48px)", display: "flex", alignItems: "stretch" }}>
-          <div style={{ paddingRight: "32px", marginRight: "0", borderRight: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", flexShrink: 0 }}>
-            <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.28)", letterSpacing: "0.14em", fontWeight: 600, lineHeight: 1.5, textTransform: "uppercase" }}>
-              Protect<br />across
-            </span>
-          </div>
-          <div style={{ display: "flex", flex: 1 }}>
-            {categories.map(({ label, cat, icon }, i) => (
-              <button
-                key={label}
-                onClick={() => onCategory(cat)}
-                style={{
-                  flex: 1, background: "none",
-                  border: "none",
-                  borderRight: i < categories.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
-                  color: "rgba(255,255,255,0.44)", cursor: "pointer",
-                  padding: "26px 12px", display: "flex", flexDirection: "column",
-                  alignItems: "center", gap: "10px", fontFamily: "inherit",
-                  transition: "color 0.18s, background 0.18s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.03)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.44)";
-                  (e.currentTarget as HTMLButtonElement).style.background = "none";
-                }}
-              >
-                <span style={{ color: "inherit" }}>{icon}</span>
-                <span style={{ fontSize: "0.76rem", fontWeight: 500, letterSpacing: "0.03em", textAlign: "center", color: "inherit" }}>
-                  {label}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+            <AnimatePresence>
+              {showEmail && !joined && (
+                <motion.div className="rr-email" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    onKeyDown={(event) => event.key === "Enter" && joinWaitlist()}
+                    placeholder="your@email.com"
+                  />
+                  <button onClick={joinWaitlist}>Join</button>
+                </motion.div>
+              )}
+              {joined && (
+                <motion.p className="rr-joined" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  You're on the list. We'll be in touch.
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </motion.div>
 
-      {/* ─── FEATURES ─────────────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "96px clamp(20px, 4vw, 48px) 80px" }}>
-        <motion.p
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          style={{ color: "rgba(255,255,255,0.25)", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "16px" }}
-        >
-          Why RecallRadar
-        </motion.p>
-        <motion.h2
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "clamp(1.9rem, 3.2vw, 3rem)",
-            lineHeight: 1.12, letterSpacing: "-0.03em",
-            fontWeight: 400, color: "#fff",
-            marginBottom: "72px", maxWidth: "560px",
-          }}
-        >
-          Everything you need to stay ahead of product recalls.
-        </motion.h2>
+          <motion.aside className="rr-status" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.45, duration: 0.6 }}>
+            <p>SYSTEM ONLINE</p>
+            <span>Monitoring recalls across 5 categories 24/7</span>
+            <RadarReticle compact />
+          </motion.aside>
+        </section>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
-          {features.map((f, i) => (
-            <motion.div
-              key={f.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.07 }}
-              style={{
-                padding: "40px 32px 44px",
-                borderTop: "1px solid rgba(255,255,255,0.07)",
-                borderLeft: i > 0 ? "1px solid rgba(255,255,255,0.07)" : "none",
+        <section id="categories" className="rr-category-rail" aria-label="Recall categories">
+          {categories.map((category, index) => (
+            <button
+              key={category.label}
+              className={activeCategoryIndex === index ? "rr-category is-active" : "rr-category"}
+              onClick={() => {
+                setActiveCategoryIndex(index);
+                setPlaceholderIndex(index);
               }}
+              onDoubleClick={() => onCategory(category.cat)}
             >
-              <div style={{ marginBottom: "22px" }}>{f.icon}</div>
-              <h3 style={{ fontSize: "1.06rem", fontWeight: 600, marginBottom: "12px", color: "#fff", letterSpacing: "-0.01em" }}>{f.title}</h3>
-              <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.92rem", lineHeight: 1.68, margin: 0 }}>{f.desc}</p>
-            </motion.div>
+              <span className="rr-category-icon"><CategoryIcon name={category.icon} /></span>
+              <span className="rr-category-copy">
+                <b>{category.label}</b>
+                <em>{category.source}</em>
+              </span>
+              {index < categories.length - 1 && <i aria-hidden="true" />}
+            </button>
+          ))}
+        </section>
+
+        <section className="rr-feature-panel" aria-label="RecallRadar capabilities">
+          {features.map((feature) => (
+            <article className="rr-feature" key={feature.title}>
+              <div className="rr-feature-icon">
+                {typeof feature.icon === "string" ? <FeatureIcon type={feature.icon} /> : feature.icon}
+              </div>
+              <h2>{feature.title}</h2>
+              <p>{feature.body}</p>
+            </article>
+          ))}
+        </section>
+      </div>
+
+      <section id="how-it-works" className="rr-section rr-how">
+        <div className="rr-section-head">
+          <p className="rr-section-kicker">HOW IT WORKS</p>
+          <h2>From search to safety decision in seconds.</h2>
+          <span>Built for real households, not regulatory experts.</span>
+        </div>
+        <div className="rr-pipeline-panel" aria-hidden="true">
+          <PipelineCanvas />
+          <div className="rr-pipeline-labels">
+            <span>Search</span>
+            <span>Match</span>
+            <span>Act</span>
+          </div>
+        </div>
+        <div className="rr-workflow">
+          {workflow.map((item) => (
+            <article key={item.step} className="rr-step">
+              <span>{item.step}</span>
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+            </article>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* ─── FOOTER CTA ───────────────────────────────────────────────────────── */}
-      <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "80px clamp(20px, 4vw, 48px)", textAlign: "center" }}>
-        <motion.h2
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "clamp(1.8rem, 3vw, 2.8rem)",
-            fontWeight: 400, letterSpacing: "-0.03em",
-            marginBottom: "14px", color: "#fff",
-          }}
-        >
-          Start protecting your household today.
-        </motion.h2>
-        <p style={{ color: "rgba(255,255,255,0.34)", marginBottom: "36px", fontSize: "0.96rem" }}>
-          No account required. Free forever for the basics.
-        </p>
-        <button
-          onClick={onLaunch}
-          style={{ background: "#ff3b30", color: "#fff", border: "none", borderRadius: "12px", padding: "16px 40px", fontSize: "1rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-        >
-          Search recalls now →
-        </button>
-        <p style={{ color: "rgba(255,255,255,0.15)", marginTop: "60px", fontSize: "0.76rem" }}>
-          RecallRadar is not affiliated with the FDA. Data is provided as-is from public government sources.
-        </p>
-      </div>
-    </div>
+      <section id="intelligence" className="rr-section rr-intelligence-band">
+        <div className="rr-orb-panel">
+          <IntelligenceCanvas />
+          <div className="rr-orb-stats" aria-label="RecallRadar source coverage metrics">
+            {coverageStats.map(([value, label]) => (
+              <div key={label}>
+                <strong>{value}</strong>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="rr-orb-readout">
+            <p>OFFICIAL SOURCE LAYER</p>
+            <strong>FDA • CPSC • NHTSA</strong>
+            <span>Public recall systems unified for product search</span>
+          </div>
+          <div className="rr-source-orbits" aria-hidden="true">
+            {sourceSignals.map((signal) => (
+              <div key={signal.source}>
+                <b>{signal.source}</b>
+                <span>{signal.scope}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rr-intel-copy">
+          <p className="rr-section-kicker">SOURCE COVERAGE</p>
+          <h2>One intelligence layer across FDA, CPSC, and NHTSA recalls.</h2>
+          <p>
+            The globe represents official recall data flowing into one household safety graph. Search now; later, the mobile app can monitor saved products and vehicles automatically.
+          </p>
+          <div className="rr-source-table">
+            {sourceSignals.map((signal) => (
+              <article key={signal.source}>
+                <div>
+                  <strong>{signal.source}</strong>
+                  <span>{signal.scope}</span>
+                </div>
+                <p><b>{signal.count}</b>{signal.label}</p>
+              </article>
+            ))}
+          </div>
+          <div className="rr-intel-grid">
+            {intelligenceCards.map(([title, body]) => (
+              <article key={title}>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="rr-section rr-coverage" aria-labelledby="coverage-title">
+        <div className="rr-section-head">
+          <p className="rr-section-kicker">CATEGORY COVERAGE</p>
+          <h2 id="coverage-title">One safety surface for the products that matter most.</h2>
+        </div>
+        <div className="rr-coverage-grid">
+          {categories.map((category) => (
+            <button key={category.label} onClick={() => onCategory(category.cat)} className="rr-coverage-card">
+              <CategoryIcon name={category.icon} />
+              <h3>{category.label}</h3>
+              <p>{category.label === "Vehicles" ? "Campaign, component, and manufacturer recall checks." : "Official recall search, plain-language risk context, and household guidance."}</p>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section id="about" className="rr-section rr-trust">
+        <div>
+          <p className="rr-section-kicker">BUILT FOR TRUST</p>
+          <h2>Independent, transparent, and designed for high-stakes clarity.</h2>
+        </div>
+        <div className="rr-trust-list">
+          {["Official-source first", "Privacy-conscious product monitoring", "Clear uncertainty when AI cannot verify", "Action steps before feature hype"].map((item) => (
+            <p key={item}><span />{item}</p>
+          ))}
+        </div>
+      </section>
+
+      <section className="rr-final-cta">
+        <RecallRadarLogo className="rr-final-logo" />
+        <h2>Know before it hurts you.</h2>
+        <p>Search recalls now, or join early access for household monitoring as RecallRadar expands.</p>
+        <div>
+          <button className="rr-primary rr-final-primary" onClick={onLaunch}>Explore intelligence <ArrowIcon /></button>
+          <button className="rr-outline" onClick={() => setShowEmail((value) => !value)}>Join early access <ArrowIcon /></button>
+        </div>
+      </section>
+
+      <style>{`
+        .rr-landing {
+          position: relative;
+          min-height: 100svh;
+          overflow-x: hidden;
+          background: #000;
+          color: #fff;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          isolation: isolate;
+        }
+
+        .rr-hero-stage {
+          position: relative;
+          min-height: 100svh;
+          overflow: hidden;
+          z-index: 1;
+        }
+
+        .rr-bg,
+        .rr-scene,
+        .rr-earthrise-bg,
+        .rr-space-vignette,
+        .rr-horizon {
+          position: absolute;
+          inset: 0;
+        }
+
+        .rr-bg {
+          z-index: 0;
+          bottom: auto;
+          height: 100svh;
+          background: #000;
+          pointer-events: none;
+        }
+
+        .rr-scene {
+          width: 100%;
+          height: 100%;
+        }
+
+        .rr-earthrise-bg {
+          z-index: 1;
+          background-image: url("/images/brand/recallradar-earth-sunrise-red.png");
+          background-size: cover;
+          background-position: 56% 48%;
+          filter: saturate(1.02) contrast(1.08) brightness(.9);
+          transform: scale(1.012);
+          transform-origin: 55% 44%;
+          animation: rrEarthriseDrift 28s ease-in-out infinite alternate;
+        }
+
+        .rr-space-vignette {
+          z-index: 2;
+          background:
+            linear-gradient(90deg, rgba(0,0,0,.98) 0%, rgba(0,0,0,.9) 25%, rgba(0,0,0,.5) 48%, rgba(0,0,0,.42) 68%, rgba(0,0,0,.78) 100%),
+            linear-gradient(180deg, rgba(0,0,0,.42) 0%, rgba(0,0,0,.1) 26%, rgba(0,0,0,.36) 66%, rgba(0,0,0,.94) 100%),
+            radial-gradient(circle at 50% 34%, rgba(18, 88, 180, .16), transparent 24%),
+            radial-gradient(circle at 66% 64%, rgba(255,59,48,.14), transparent 34%);
+          pointer-events: none;
+        }
+
+        .rr-horizon {
+          top: auto;
+          height: 50%;
+          z-index: 3;
+          background:
+            radial-gradient(ellipse at 52% 8%, rgba(255,255,255,.42), rgba(64,146,255,.2) 12%, transparent 28%),
+            linear-gradient(180deg, transparent 0 38%, rgba(255,255,255,.14) 39%, rgba(107,177,255,.2) 40%, transparent 45%),
+            radial-gradient(ellipse at 60% 34%, rgba(255,59,48,.16), transparent 46%);
+          mix-blend-mode: screen;
+          opacity: .58;
+          pointer-events: none;
+        }
+
+        .rr-nav {
+          position: relative;
+          z-index: 5;
+          height: 128px;
+          display: grid;
+          grid-template-columns: minmax(420px, 1fr) auto minmax(330px, 1fr);
+          align-items: center;
+          gap: 28px;
+          padding: 0 clamp(28px, 4vw, 64px);
+        }
+
+        .rr-logo {
+          display: block;
+          color: #fff;
+          text-decoration: none;
+          width: 342px;
+          height: 142px;
+          transform: translate(-18px, 3px);
+        }
+
+        .rr-logo .rr-mark {
+          display: block;
+          width: 100%;
+          height: 100%;
+          overflow: visible;
+        }
+
+        .rr-mark--compact {
+          width: 64px;
+          height: 35px;
+        }
+
+        .rr-links {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: clamp(30px, 4vw, 58px);
+        }
+
+        .rr-links a,
+        .rr-signin {
+          color: rgba(255,255,255,.9);
+          text-decoration: none;
+          font-size: 15px;
+          font-weight: 520;
+        }
+
+        .rr-actions {
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          gap: 26px;
+        }
+
+        .rr-signin,
+        .rr-outline,
+        .rr-primary,
+        .rr-email button,
+        .rr-category {
+          font: inherit;
+          cursor: pointer;
+        }
+
+        .rr-signin {
+          border: 0;
+          background: transparent;
+          padding: 10px 0;
+        }
+
+        .rr-outline {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 18px;
+          min-height: 50px;
+          padding: 0 22px 0 25px;
+          border: 1px solid rgba(255, 68, 55, .95);
+          border-radius: 999px;
+          background: rgba(0,0,0,.28);
+          color: #fff;
+          box-shadow: 0 0 24px rgba(255, 59, 48, .2), inset 0 0 18px rgba(255, 59, 48, .08);
+          font-size: 15px;
+          font-weight: 560;
+          white-space: nowrap;
+        }
+
+        .rr-outline svg,
+        .rr-primary svg {
+          width: 18px;
+          height: 18px;
+        }
+
+        .rr-hero {
+          position: relative;
+          z-index: 4;
+          min-height: calc(100svh - 98px);
+          display: grid;
+          grid-template-columns: minmax(300px, 560px) 1fr minmax(150px, 250px);
+          align-items: center;
+          gap: 34px;
+          padding: 50px clamp(28px, 9vw, 140px) 286px;
+        }
+
+        .rr-copy {
+          align-self: center;
+          padding-top: 32px;
+        }
+
+        .rr-kicker {
+          margin: 0 0 24px;
+          color: #ff3b30;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: .38em;
+        }
+
+        .rr-copy h1 {
+          margin: 0;
+          max-width: 590px;
+          font-size: clamp(54px, 5.1vw, 76px);
+          line-height: .98;
+          letter-spacing: 0;
+          font-weight: 280;
+          text-shadow: 0 0 22px rgba(255,255,255,.18);
+        }
+
+        .rr-copy h1 span {
+          color: #ff332c;
+          text-shadow: 0 0 20px rgba(255,59,48,.2);
+        }
+
+        .rr-body {
+          max-width: 440px;
+          margin: 30px 0 0;
+          color: rgba(255,255,255,.56);
+          font-size: 16px;
+          line-height: 1.72;
+        }
+
+        .rr-command-deck {
+          position: relative;
+          width: min(100%, 700px);
+          margin-top: 34px;
+          padding: 10px;
+          border: 1px solid rgba(255,255,255,.11);
+          border-radius: 32px;
+          background:
+            linear-gradient(115deg, rgba(255,59,48,.14), transparent 36%),
+            rgba(4, 4, 4, .68);
+          box-shadow:
+            0 0 0 1px rgba(255,59,48,.07),
+            0 0 54px rgba(255,59,48,.16),
+            inset 0 1px 0 rgba(255,255,255,.055);
+          backdrop-filter: blur(18px);
+          overflow: hidden;
+        }
+
+        .rr-command-deck::before {
+          content: "";
+          position: absolute;
+          left: -30%;
+          top: 0;
+          width: 28%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,.09), rgba(255,59,48,.16), transparent);
+          transform: skewX(-18deg);
+          animation: rrCommandSweep 5.5s ease-in-out infinite;
+          pointer-events: none;
+        }
+
+        .rr-command-topline {
+          position: relative;
+          z-index: 1;
+          display: grid;
+          grid-template-columns: 1fr auto 1fr;
+          align-items: center;
+          gap: 12px;
+          padding: 0 8px 9px;
+        }
+
+        .rr-command-topline > span,
+        .rr-command-topline > strong {
+          color: rgba(255,255,255,.45);
+          font-size: 10px;
+          font-weight: 850;
+          letter-spacing: .24em;
+        }
+
+        .rr-command-topline > strong {
+          justify-self: end;
+          color: #ff4a40;
+        }
+
+        .rr-mode-toggle {
+          display: inline-flex;
+          align-items: center;
+          padding: 3px;
+          border: 1px solid rgba(255,255,255,.09);
+          border-radius: 999px;
+          background: rgba(0,0,0,.46);
+        }
+
+        .rr-mode-toggle button {
+          min-width: 74px;
+          height: 28px;
+          border: 0;
+          border-radius: 999px;
+          background: transparent;
+          color: rgba(255,255,255,.42);
+          font: inherit;
+          font-size: 11px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: .1em;
+          cursor: pointer;
+        }
+
+        .rr-mode-toggle button.is-active {
+          background: rgba(255,59,48,.94);
+          color: #fff;
+          box-shadow: 0 0 20px rgba(255,59,48,.34);
+        }
+
+        .rr-search-shell {
+          position: relative;
+          display: grid;
+          grid-template-columns: 74px minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          min-height: 72px;
+          padding: 8px 9px 8px 11px;
+          border: 1px solid rgba(255,255,255,.11);
+          border-radius: 999px;
+          background:
+            linear-gradient(90deg, rgba(255,59,48,.14), transparent 38%),
+            rgba(5, 5, 5, .72);
+          box-shadow:
+            0 0 0 1px rgba(255,59,48,.08),
+            0 0 46px rgba(255,59,48,.18),
+            inset 0 0 30px rgba(255,255,255,.035);
+          backdrop-filter: blur(18px);
+          overflow: hidden;
+        }
+
+        .rr-search-shell::before {
+          content: "";
+          position: absolute;
+          inset: 1px;
+          border-radius: inherit;
+          background:
+            linear-gradient(90deg, rgba(255,255,255,.1), transparent 18% 82%, rgba(255,59,48,.13)),
+            radial-gradient(circle at 82% 50%, rgba(255,59,48,.28), transparent 30%);
+          pointer-events: none;
+          opacity: .78;
+        }
+
+        .rr-search-shell input,
+        .rr-search-action,
+        .rr-search-lens {
+          position: relative;
+          z-index: 1;
+        }
+
+        .rr-search-shell input {
+          width: 100%;
+          min-width: 0;
+          height: 48px;
+          border: 0;
+          outline: 0;
+          background: transparent;
+          color: #fff;
+          font-size: 15px;
+          font-weight: 560;
+        }
+
+        .rr-search-shell input::placeholder {
+          color: rgba(255,255,255,.42);
+        }
+
+        .rr-search-shell:focus-within {
+          border-color: rgba(255,59,48,.38);
+          box-shadow: inset 0 0 26px rgba(255,59,48,.08), 0 0 36px rgba(255,59,48,.16);
+        }
+
+        .rr-search-lens {
+          display: grid;
+          place-items: center;
+          width: 58px;
+          height: 58px;
+          border-radius: 999px;
+          background: radial-gradient(circle, rgba(255,59,48,.2), rgba(255,59,48,.04) 56%, transparent 70%);
+          box-shadow: inset 0 0 18px rgba(255,255,255,.06), 0 0 28px rgba(255,59,48,.28);
+        }
+
+        .rr-lens-button {
+          display: inline-grid;
+          grid-template-columns: auto auto;
+          align-items: center;
+          gap: 10px;
+          color: #fff;
+          font-size: 13px;
+          font-weight: 760;
+        }
+
+        .rr-lens-core {
+          position: relative;
+          display: block;
+          width: 46px;
+          height: 46px;
+          border-radius: 999px;
+          animation: rrLensSpin 7s linear infinite;
+        }
+
+        .rr-lens-core i {
+          position: absolute;
+          left: 50%;
+          top: 1px;
+          width: 1.4px;
+          height: 8px;
+          margin-left: -.7px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.55);
+          transform-origin: 50% 22px;
+        }
+
+        .rr-lens-core i:nth-child(9n),
+        .rr-lens-core i:nth-child(9n + 1) {
+          background: #ff3b30;
+          box-shadow: 0 0 7px rgba(255,59,48,.8);
+        }
+
+        .rr-lens-core b {
+          position: absolute;
+          inset: 11px;
+          border: 1px solid rgba(255,255,255,.12);
+          border-radius: 999px;
+          background: radial-gradient(circle at 60% 35%, rgba(255,255,255,.12), rgba(0,0,0,.82) 50%);
+          box-shadow: inset 0 0 14px rgba(0,0,0,.8), 0 0 20px rgba(255,59,48,.14);
+        }
+
+        .rr-search-action {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 13px;
+          min-height: 54px;
+          padding: 0 9px 0 22px;
+          border: 0;
+          border-radius: 999px;
+          background: #ff241f;
+          color: #fff;
+          box-shadow: 0 0 30px rgba(255, 59, 48, .36);
+          font: inherit;
+          font-size: 14px;
+          font-weight: 800;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .rr-primary {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 18px;
+          min-height: 56px;
+          padding: 0 9px 0 24px;
+          border: 0;
+          border-radius: 999px;
+          background: #ff241f;
+          color: #fff;
+          box-shadow: 0 0 28px rgba(255, 59, 48, .34);
+          font-size: 15px;
+          font-weight: 760;
+        }
+
+        .rr-primary svg {
+          width: 40px;
+          height: 40px;
+          padding: 10px;
+          border-radius: 999px;
+          background: #fff;
+          color: #ff332c;
+        }
+
+        .rr-search-action svg {
+          width: 38px;
+          height: 38px;
+          padding: 10px;
+          border-radius: 999px;
+          background: #fff;
+          color: #ff332c;
+          flex: 0 0 auto;
+        }
+
+        .rr-command-examples {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 10px 8px 2px;
+          flex-wrap: wrap;
+        }
+
+        .rr-command-examples span {
+          color: rgba(255,255,255,.28);
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: .18em;
+          text-transform: uppercase;
+        }
+
+        .rr-command-examples button {
+          min-height: 28px;
+          padding: 0 11px;
+          border: 1px solid rgba(255,255,255,.07);
+          border-radius: 999px;
+          background: rgba(255,255,255,.025);
+          color: rgba(255,255,255,.45);
+          font: inherit;
+          font-size: 12px;
+          font-weight: 650;
+          cursor: pointer;
+          transition: color .18s ease, border-color .18s ease, background .18s ease;
+        }
+
+        .rr-command-examples button:hover,
+        .rr-command-examples button.is-active {
+          color: #fff;
+          border-color: rgba(255,59,48,.34);
+          background: rgba(255,59,48,.08);
+        }
+
+        .rr-email {
+          display: flex;
+          gap: 8px;
+          max-width: 410px;
+          margin-top: 18px;
+        }
+
+        .rr-email input {
+          min-width: 0;
+          flex: 1;
+          height: 48px;
+          border: 1px solid rgba(255,255,255,.11);
+          border-radius: 999px;
+          background: rgba(0,0,0,.5);
+          color: #fff;
+          padding: 0 18px;
+          outline: none;
+        }
+
+        .rr-email button {
+          border: 0;
+          border-radius: 999px;
+          background: #fff;
+          color: #050505;
+          padding: 0 20px;
+          font-weight: 750;
+        }
+
+        .rr-joined {
+          margin-top: 18px;
+          color: #a7f3d0;
+          font-weight: 650;
+        }
+
+        .rr-status {
+          grid-column: 3;
+          justify-self: end;
+          width: 190px;
+          margin-top: 62px;
+          color: rgba(255,255,255,.56);
+        }
+
+        .rr-status p {
+          margin: 0 0 8px;
+          color: #ff3b30;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: .34em;
+        }
+
+        .rr-status span {
+          display: block;
+          max-width: 150px;
+          font-size: 15px;
+          line-height: 1.55;
+        }
+
+        .rr-reticle {
+          display: block;
+          width: 76px;
+          height: 76px;
+          margin-top: 30px;
+          opacity: .75;
+        }
+
+        .rr-reticle--compact {
+          width: 54px;
+          height: 54px;
+        }
+
+        .rr-category-rail {
+          position: absolute;
+          left: clamp(28px, 9vw, 140px);
+          right: clamp(28px, 9vw, 140px);
+          bottom: 214px;
+          z-index: 5;
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          align-items: center;
+          min-height: 82px;
+          border-top: 1px solid rgba(255,255,255,.07);
+          border-bottom: 1px solid rgba(255,255,255,.025);
+          background: linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.36));
+        }
+
+        .rr-category {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 16px;
+          min-width: 0;
+          height: 82px;
+          border: 0;
+          background: transparent;
+          color: rgba(255,255,255,.88);
+          font-size: 15px;
+          font-weight: 620;
+          transition: background .18s ease, color .18s ease;
+          overflow: hidden;
+        }
+
+        .rr-category::before {
+          content: "";
+          position: absolute;
+          inset: 12px 18px;
+          border: 1px solid rgba(255,255,255,0);
+          border-radius: 999px;
+          background: transparent;
+          opacity: 0;
+          transition: opacity .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+        }
+
+        .rr-category:hover::before,
+        .rr-category.is-active::before {
+          opacity: 1;
+          border-color: rgba(255,59,48,.24);
+          background: radial-gradient(circle at 24% 50%, rgba(255,59,48,.13), rgba(255,255,255,.025) 62%);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 0 22px rgba(255,59,48,.1);
+        }
+
+        .rr-category.is-active {
+          color: #fff;
+        }
+
+        .rr-category-icon,
+        .rr-category-copy {
+          position: relative;
+          z-index: 1;
+        }
+
+        .rr-category-icon {
+          display: grid;
+          place-items: center;
+          width: 36px;
+          height: 36px;
+          border-radius: 999px;
+          transition: transform .18s ease, background .18s ease;
+        }
+
+        .rr-category:hover .rr-category-icon,
+        .rr-category.is-active .rr-category-icon {
+          transform: translateY(-1px);
+          background: rgba(255,59,48,.12);
+        }
+
+        .rr-category svg {
+          width: 28px;
+          height: 28px;
+          color: rgba(255,255,255,.82);
+        }
+
+        .rr-category-copy {
+          display: grid;
+          gap: 3px;
+          text-align: left;
+        }
+
+        .rr-category-copy b {
+          font-size: 15px;
+          line-height: 1;
+        }
+
+        .rr-category-copy em {
+          color: rgba(255,59,48,.82);
+          font-size: 10px;
+          font-style: normal;
+          font-weight: 850;
+          letter-spacing: .18em;
+          line-height: 1;
+          opacity: 0;
+          transform: translateY(-2px);
+          transition: opacity .18s ease, transform .18s ease;
+        }
+
+        .rr-category:hover .rr-category-copy em,
+        .rr-category.is-active .rr-category-copy em {
+          opacity: 1;
+          transform: translateY(0);
+        }
+
+        .rr-category i {
+          position: absolute;
+          right: 0;
+          top: 27px;
+          width: 1px;
+          height: 26px;
+          background: rgba(255,255,255,.12);
+        }
+
+        .rr-feature-panel {
+          position: absolute;
+          left: clamp(28px, 9vw, 140px);
+          right: clamp(28px, 9vw, 140px);
+          bottom: 0;
+          z-index: 5;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          min-height: 186px;
+          border: 1px solid rgba(255,255,255,.12);
+          border-bottom: 0;
+          border-radius: 22px 22px 0 0;
+          background: linear-gradient(180deg, rgba(5,7,8,.72), rgba(1,1,1,.92));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 -24px 90px rgba(0,0,0,.36);
+          backdrop-filter: blur(16px);
+        }
+
+        .rr-feature {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-width: 0;
+          padding: 30px 36px 34px;
+          text-align: center;
+        }
+
+        .rr-feature:not(:last-child)::after {
+          content: "";
+          position: absolute;
+          right: 0;
+          bottom: 46px;
+          width: 1px;
+          height: 56px;
+          background: rgba(255,255,255,.1);
+        }
+
+        .rr-feature-icon {
+          display: grid;
+          place-items: center;
+          width: 58px;
+          height: 58px;
+          margin-bottom: 14px;
+          border: 1px solid rgba(255,255,255,.13);
+          border-radius: 999px;
+          background: radial-gradient(circle at 50% 50%, rgba(255,59,48,.18), transparent 58%);
+        }
+
+        .rr-feature-icon .rr-mark {
+          width: 48px;
+          height: 34px;
+          overflow: visible;
+        }
+
+        .rr-feature-svg {
+          width: 46px;
+          height: 46px;
+        }
+
+        .rr-feature h2 {
+          margin: 0 0 9px;
+          font-size: 16px;
+          line-height: 1.2;
+          letter-spacing: 0;
+          font-weight: 760;
+        }
+
+        .rr-feature p {
+          max-width: 235px;
+          margin: 0;
+          color: rgba(255,255,255,.48);
+          font-size: 14px;
+          line-height: 1.38;
+        }
+
+        .rr-section {
+          position: relative;
+          z-index: 4;
+          width: min(100% - 56px, 1256px);
+          margin: 0 auto;
+          padding: 118px 0;
+        }
+
+        .rr-section::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent);
+        }
+
+        .rr-section-head {
+          display: grid;
+          grid-template-columns: minmax(280px, 640px) minmax(220px, 360px);
+          align-items: end;
+          justify-content: space-between;
+          gap: 36px;
+          margin-bottom: 54px;
+        }
+
+        .rr-section-kicker {
+          margin: 0 0 16px;
+          color: #ff3b30;
+          font-size: 12px;
+          font-weight: 850;
+          letter-spacing: .34em;
+        }
+
+        .rr-section h2,
+        .rr-final-cta h2 {
+          margin: 0;
+          color: #f8f8f6;
+          font-size: clamp(34px, 4vw, 58px);
+          font-weight: 280;
+          line-height: 1.02;
+          letter-spacing: 0;
+          text-shadow: 0 0 20px rgba(255,255,255,.12);
+        }
+
+        .rr-section-head span,
+        .rr-intel-copy > p,
+        .rr-final-cta > p {
+          color: rgba(255,255,255,.52);
+          font-size: 16px;
+          line-height: 1.65;
+        }
+
+        .rr-workflow {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          border: 1px solid rgba(255,255,255,.11);
+          border-radius: 22px;
+          background:
+            radial-gradient(circle at 18% 8%, rgba(255,59,48,.11), transparent 30%),
+            linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+          overflow: hidden;
+          backdrop-filter: blur(18px);
+        }
+
+        .rr-pipeline-panel {
+          position: relative;
+          height: 190px;
+          margin: -18px 0 18px;
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 22px;
+          background:
+            radial-gradient(circle at 50% 50%, rgba(255,59,48,.13), transparent 42%),
+            linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+          overflow: hidden;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 28px 80px rgba(0,0,0,.24);
+        }
+
+        .rr-pipeline-panel::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background:
+            linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(255,255,255,.025) 1px, transparent 1px);
+          background-size: 90px 90px;
+          mask-image: radial-gradient(circle at 50% 50%, #000 0 42%, transparent 74%);
+          pointer-events: none;
+        }
+
+        .rr-pipeline-canvas {
+          position: absolute !important;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+        }
+
+        .rr-pipeline-labels {
+          position: absolute;
+          left: 12%;
+          right: 12%;
+          bottom: 20px;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 18px;
+          pointer-events: none;
+        }
+
+        .rr-pipeline-labels span {
+          justify-self: center;
+          min-width: 86px;
+          padding: 7px 12px;
+          border: 1px solid rgba(255,59,48,.22);
+          border-radius: 999px;
+          background: rgba(0,0,0,.42);
+          color: rgba(255,255,255,.78);
+          font-size: 11px;
+          font-weight: 850;
+          letter-spacing: .18em;
+          text-align: center;
+          text-transform: uppercase;
+          backdrop-filter: blur(10px);
+        }
+
+        .rr-step {
+          position: relative;
+          min-height: 270px;
+          padding: 34px 34px 38px;
+        }
+
+        .rr-step:not(:last-child) {
+          border-right: 1px solid rgba(255,255,255,.09);
+        }
+
+        .rr-step span {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 48px;
+          height: 48px;
+          margin-bottom: 58px;
+          border: 1px solid rgba(255,59,48,.34);
+          border-radius: 999px;
+          color: #ff4a40;
+          background: rgba(255,59,48,.08);
+          box-shadow: 0 0 28px rgba(255,59,48,.15);
+          font-size: 12px;
+          font-weight: 850;
+          letter-spacing: .12em;
+        }
+
+        .rr-step h3,
+        .rr-intel-grid h3,
+        .rr-coverage-card h3 {
+          margin: 0 0 12px;
+          color: #fff;
+          font-size: 18px;
+          line-height: 1.22;
+          font-weight: 760;
+        }
+
+        .rr-step p,
+        .rr-intel-grid p,
+        .rr-coverage-card p,
+        .rr-trust-list p {
+          margin: 0;
+          color: rgba(255,255,255,.48);
+          font-size: 14px;
+          line-height: 1.58;
+        }
+
+        .rr-intelligence-band {
+          display: grid;
+          grid-template-columns: minmax(320px, 470px) minmax(420px, 1fr);
+          align-items: center;
+          gap: clamp(42px, 7vw, 90px);
+        }
+
+        .rr-orb-panel {
+          position: relative;
+          min-height: 520px;
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 24px;
+          background:
+            radial-gradient(circle at 50% 44%, rgba(255,59,48,.2), transparent 36%),
+            linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.012));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 40px 120px rgba(0,0,0,.32);
+          overflow: hidden;
+        }
+
+        .rr-orb-panel::after {
+          content: "";
+          position: absolute;
+          left: 10%;
+          right: 10%;
+          bottom: 22%;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(255,59,48,.7), rgba(255,255,255,.48), rgba(255,59,48,.7), transparent);
+          box-shadow: 0 0 30px rgba(255,59,48,.45);
+        }
+
+        .rr-orb-stats {
+          position: absolute;
+          left: 24px;
+          right: 24px;
+          top: 24px;
+          z-index: 2;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+        }
+
+        .rr-orb-stats div {
+          min-width: 0;
+          padding: 13px 12px 12px;
+          border: 1px solid rgba(255,255,255,.09);
+          border-radius: 14px;
+          background: rgba(0,0,0,.45);
+          backdrop-filter: blur(12px);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+        }
+
+        .rr-orb-stats strong {
+          display: block;
+          color: #fff;
+          font-size: 28px;
+          font-weight: 780;
+          line-height: 1;
+          letter-spacing: 0;
+        }
+
+        .rr-orb-stats span {
+          display: block;
+          margin-top: 6px;
+          color: rgba(255,255,255,.42);
+          font-size: 11px;
+          line-height: 1.2;
+          text-transform: uppercase;
+          letter-spacing: .12em;
+        }
+
+        .rr-source-orbits {
+          position: absolute;
+          inset: 0;
+          z-index: 1;
+          pointer-events: none;
+        }
+
+        .rr-source-orbits div {
+          position: absolute;
+          display: grid;
+          gap: 3px;
+          min-width: 126px;
+          padding: 10px 12px;
+          border: 1px solid rgba(255,59,48,.18);
+          border-radius: 999px;
+          background: rgba(0,0,0,.44);
+          box-shadow: 0 0 22px rgba(255,59,48,.1);
+          backdrop-filter: blur(10px);
+        }
+
+        .rr-source-orbits div:nth-child(1) {
+          left: 9%;
+          top: 38%;
+        }
+
+        .rr-source-orbits div:nth-child(2) {
+          right: 8%;
+          top: 43%;
+        }
+
+        .rr-source-orbits div:nth-child(3) {
+          right: 17%;
+          bottom: 31%;
+        }
+
+        .rr-source-orbits b {
+          color: #ff443a;
+          font-size: 11px;
+          letter-spacing: .24em;
+        }
+
+        .rr-source-orbits span {
+          color: rgba(255,255,255,.58);
+          font-size: 11px;
+          white-space: nowrap;
+        }
+
+        .rr-mini-canvas {
+          position: absolute !important;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+        }
+
+        .rr-orb-readout {
+          position: absolute;
+          left: 28px;
+          right: 28px;
+          bottom: 28px;
+          display: grid;
+          gap: 5px;
+          padding: 18px 20px;
+          border: 1px solid rgba(255,255,255,.09);
+          border-radius: 16px;
+          background: rgba(0,0,0,.5);
+          backdrop-filter: blur(14px);
+        }
+
+        .rr-orb-readout p {
+          margin: 0;
+          color: #ff3b30;
+          font-size: 11px;
+          font-weight: 850;
+          letter-spacing: .28em;
+        }
+
+        .rr-orb-readout strong {
+          color: #fff;
+          font-size: 15px;
+        }
+
+        .rr-orb-readout span {
+          color: rgba(255,255,255,.42);
+          font-size: 13px;
+        }
+
+        .rr-intel-copy > p {
+          max-width: 640px;
+          margin: 22px 0 34px;
+        }
+
+        .rr-source-table {
+          display: grid;
+          gap: 8px;
+          margin-bottom: 28px;
+        }
+
+        .rr-source-table article {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 18px;
+          min-height: 72px;
+          padding: 13px 16px;
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 16px;
+          background:
+            linear-gradient(90deg, rgba(255,59,48,.06), transparent 50%),
+            rgba(255,255,255,.02);
+        }
+
+        .rr-source-table strong {
+          display: block;
+          color: #fff;
+          font-size: 15px;
+          letter-spacing: .18em;
+        }
+
+        .rr-source-table span {
+          display: block;
+          margin-top: 5px;
+          color: rgba(255,255,255,.46);
+          font-size: 13px;
+        }
+
+        .rr-source-table p {
+          display: inline-flex;
+          align-items: baseline;
+          gap: 7px;
+          margin: 0;
+          color: rgba(255,255,255,.46);
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: .12em;
+          white-space: nowrap;
+        }
+
+        .rr-source-table b {
+          color: #ff3b30;
+          font-size: 30px;
+          line-height: 1;
+          letter-spacing: 0;
+          text-transform: none;
+        }
+
+        .rr-intel-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .rr-intel-grid article,
+        .rr-coverage-card {
+          border: 1px solid rgba(255,255,255,.09);
+          border-radius: 16px;
+          background: rgba(255,255,255,.025);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+        }
+
+        .rr-intel-grid article {
+          padding: 22px;
+        }
+
+        .rr-coverage-grid {
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 12px;
+        }
+
+        .rr-coverage-card {
+          min-height: 230px;
+          padding: 25px 22px;
+          color: #fff;
+          text-align: left;
+          font: inherit;
+          cursor: pointer;
+          transition: transform .18s ease, border-color .18s ease, background .18s ease;
+        }
+
+        .rr-coverage-card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(255,59,48,.34);
+          background: rgba(255,59,48,.045);
+        }
+
+        .rr-coverage-card svg {
+          width: 34px;
+          height: 34px;
+          margin-bottom: 46px;
+          color: rgba(255,255,255,.86);
+        }
+
+        .rr-trust {
+          display: grid;
+          grid-template-columns: minmax(320px, 640px) minmax(320px, 470px);
+          gap: clamp(40px, 7vw, 96px);
+          align-items: center;
+        }
+
+        .rr-trust-list {
+          display: grid;
+          gap: 12px;
+        }
+
+        .rr-trust-list p {
+          display: flex;
+          align-items: center;
+          gap: 13px;
+          min-height: 58px;
+          padding: 0 18px;
+          border: 1px solid rgba(255,255,255,.09);
+          border-radius: 999px;
+          background: rgba(255,255,255,.025);
+          color: rgba(255,255,255,.68);
+          font-weight: 620;
+        }
+
+        .rr-trust-list span {
+          width: 9px;
+          height: 9px;
+          border-radius: 999px;
+          background: #ff3b30;
+          box-shadow: 0 0 16px rgba(255,59,48,.8);
+          flex: 0 0 auto;
+        }
+
+        .rr-final-cta {
+          position: relative;
+          z-index: 4;
+          display: grid;
+          justify-items: center;
+          width: min(100% - 56px, 980px);
+          margin: 20px auto 0;
+          padding: 118px 0 130px;
+          text-align: center;
+        }
+
+        .rr-final-logo {
+          width: 280px;
+          height: 116px;
+          margin-bottom: 10px;
+          overflow: visible;
+        }
+
+        .rr-final-cta > p {
+          max-width: 620px;
+          margin: 20px 0 34px;
+        }
+
+        .rr-final-cta > div {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          flex-wrap: wrap;
+        }
+
+        .rr-final-primary svg {
+          width: 38px;
+          height: 38px;
+        }
+
+        @media (max-width: 1080px) {
+          .rr-nav {
+            grid-template-columns: 1fr auto;
+          }
+
+          .rr-links {
+            display: none;
+          }
+
+          .rr-hero {
+            grid-template-columns: minmax(280px, 560px) 1fr;
+            padding-bottom: 320px;
+          }
+
+          .rr-status {
+            grid-column: 2;
+          }
+
+          .rr-category-rail,
+          .rr-feature-panel {
+            left: 24px;
+            right: 24px;
+          }
+
+          .rr-workflow,
+          .rr-intelligence-band,
+          .rr-trust,
+          .rr-section-head {
+            grid-template-columns: 1fr;
+          }
+
+          .rr-coverage-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 760px) {
+          .rr-hero-stage {
+            min-height: 1180px;
+          }
+
+          .rr-nav {
+            height: auto;
+            display: flex;
+            padding: 24px 20px 0;
+          }
+
+          .rr-logo .rr-mark {
+            width: 100%;
+            height: 100%;
+          }
+
+          .rr-logo {
+            width: 198px;
+            height: 82px;
+          }
+
+          .rr-actions {
+            gap: 12px;
+          }
+
+          .rr-signin {
+            display: none;
+          }
+
+          .rr-outline {
+            min-height: 42px;
+            padding: 0 14px 0 16px;
+            font-size: 13px;
+          }
+
+          .rr-hero {
+            min-height: 720px;
+            display: block;
+            padding: 92px 22px 420px;
+          }
+
+          .rr-copy {
+            padding-top: 0;
+          }
+
+          .rr-copy h1 {
+            font-size: clamp(44px, 13vw, 62px);
+          }
+
+          .rr-body {
+            max-width: 350px;
+            font-size: 15px;
+          }
+
+          .rr-search-shell {
+            grid-template-columns: 54px minmax(0, 1fr);
+            border-radius: 30px;
+            padding: 8px;
+            width: 100%;
+          }
+
+          .rr-search-action {
+            grid-column: 1 / -1;
+            min-height: 50px;
+            width: 100%;
+          }
+
+          .rr-search-lens {
+            width: 48px;
+            height: 48px;
+          }
+
+          .rr-lens-core {
+            width: 40px;
+            height: 40px;
+          }
+
+          .rr-lens-core i {
+            transform-origin: 50% 19px;
+          }
+
+          .rr-status {
+            display: none;
+          }
+
+          .rr-category-rail {
+            left: 18px;
+            right: 18px;
+            bottom: 382px;
+            grid-template-columns: repeat(2, 1fr);
+            min-height: 0;
+          }
+
+          .rr-category {
+            height: 54px;
+            justify-content: flex-start;
+            padding-left: 20px;
+            font-size: 13px;
+          }
+
+          .rr-category i {
+            display: none;
+          }
+
+          .rr-feature-panel {
+            left: 18px;
+            right: 18px;
+            grid-template-columns: 1fr;
+            min-height: 0;
+            border-radius: 18px 18px 0 0;
+          }
+
+          .rr-feature {
+            min-height: 126px;
+            padding: 20px 24px;
+          }
+
+          .rr-feature:not(:last-child)::after {
+            left: 24px;
+            right: 24px;
+            bottom: 0;
+            top: auto;
+            width: auto;
+            height: 1px;
+          }
+
+          .rr-section {
+            width: min(100% - 36px, 1256px);
+            padding: 82px 0;
+          }
+
+          .rr-section-head {
+            margin-bottom: 32px;
+          }
+
+          .rr-workflow,
+          .rr-intel-grid,
+          .rr-coverage-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .rr-step {
+            min-height: 0;
+          }
+
+          .rr-pipeline-panel {
+            height: 170px;
+            margin-top: 0;
+          }
+
+          .rr-pipeline-labels {
+            left: 8px;
+            right: 8px;
+            gap: 8px;
+          }
+
+          .rr-pipeline-labels span {
+            min-width: 0;
+            width: 100%;
+            font-size: 10px;
+            letter-spacing: .1em;
+          }
+
+          .rr-step:not(:last-child) {
+            border-right: 0;
+            border-bottom: 1px solid rgba(255,255,255,.09);
+          }
+
+          .rr-step span {
+            margin-bottom: 28px;
+          }
+
+          .rr-orb-panel {
+            min-height: 420px;
+          }
+
+          .rr-orb-stats {
+            grid-template-columns: 1fr;
+            right: auto;
+            width: 132px;
+          }
+
+          .rr-orb-stats strong {
+            font-size: 23px;
+          }
+
+          .rr-source-orbits {
+            display: none;
+          }
+
+          .rr-source-table article {
+            grid-template-columns: 1fr;
+          }
+
+          .rr-source-table p {
+            justify-content: flex-start;
+          }
+
+          .rr-trust-list p {
+            border-radius: 18px;
+          }
+
+          .rr-final-cta {
+            width: min(100% - 36px, 980px);
+            padding: 82px 0 96px;
+          }
+        }
+
+        @keyframes rrLensSpin {
+          to { transform: rotate(360deg); }
+        }
+
+        @keyframes rrCommandSweep {
+          0%, 58% { transform: translateX(0) skewX(-18deg); opacity: 0; }
+          68% { opacity: .85; }
+          100% { transform: translateX(520%) skewX(-18deg); opacity: 0; }
+        }
+
+        @keyframes rrEarthriseDrift {
+          from {
+            transform: scale(1.012) translate3d(0, 0, 0);
+            filter: saturate(1) contrast(1.06) brightness(.86);
+          }
+          to {
+            transform: scale(1.045) translate3d(-1.2%, .6%, 0);
+            filter: saturate(1.08) contrast(1.1) brightness(.94);
+          }
+        }
+      `}</style>
+    </main>
   );
 }

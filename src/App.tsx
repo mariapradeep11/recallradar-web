@@ -6,6 +6,7 @@ import BarcodeScanner from "./BarcodeScanner";
 import PhotoHero from "./PhotoHero.jsx";
 import FloatingPhotos from "./FloatingPhotos.jsx";
 import LandingPage from "./LandingPage";
+import RecallRadarLogo from "./RecallRadarLogo";
 
 type Category = "food" | "drug" | "device" | "consumer";
 type Severity = "LOW" | "MEDIUM" | "HIGH";
@@ -247,70 +248,13 @@ export default function App() {
             display: "flex", justifyContent: "space-between", alignItems: "center",
             padding: "28px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
           }}>
-            {/* Logo — Horizon mark with atmospheric glow */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer", gap: 0 }}>
-              <svg width="88" height="44" viewBox="0 0 100 50" fill="none" style={{ overflow: "visible" }}>
-                <defs>
-                  <filter id="navArcGlow" x="-20%" y="-80%" width="140%" height="260%">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="2.8" result="blur" />
-                  </filter>
-                  <filter id="navFlareAtmos" x="-300%" y="-300%" width="700%" height="700%">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
-                  </filter>
-                  <filter id="navFlareMid" x="-200%" y="-200%" width="500%" height="500%">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
-                  </filter>
-                  <linearGradient id="navArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#ff3b30" stopOpacity="0" />
-                    <stop offset="22%" stopColor="#ff3b30" stopOpacity="0.65" />
-                    <stop offset="50%" stopColor="#ff5540" stopOpacity="1" />
-                    <stop offset="78%" stopColor="#ff3b30" stopOpacity="0.65" />
-                    <stop offset="100%" stopColor="#ff3b30" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-
-                {/* Arc — outer glow bloom */}
-                <path d="M4 47 Q50 7 96 47" stroke="#ff3b30" strokeWidth="6" fill="none" strokeLinecap="round" filter="url(#navArcGlow)" opacity="0.35" />
-                {/* Arc — inner glow */}
-                <path d="M8 47 Q50 9 92 47" stroke="#ff4433" strokeWidth="2" fill="none" strokeLinecap="round" filter="url(#navArcGlow)" opacity="0.5" />
-                {/* Arc — sharp edge */}
-                <path d="M10 47 Q50 11 90 47" stroke="url(#navArcGrad)" strokeWidth="0.9" fill="none" strokeLinecap="round" />
-
-                {/* Flare — outer atmosphere */}
-                <circle cx="50" cy="11" r="14" fill="#cc2010" opacity="0.14" filter="url(#navFlareAtmos)" />
-                {/* Flare — mid bloom */}
-                <circle cx="50" cy="11" r="6" fill="#ff3020" opacity="0.28" filter="url(#navFlareMid)" />
-                {/* Flare — soft core */}
-                <circle cx="50" cy="11" r="3" fill="#ff4433" opacity="0.7" filter="url(#navFlareMid)" />
-                {/* Flare — sharp core */}
-                <circle cx="50" cy="11" r="2" fill="#ff6655" opacity="0.92" />
-                {/* Flare — white hot point */}
-                <circle cx="50" cy="11" r="0.85" fill="white" opacity="0.97" />
-
-                {/* Ray — straight up */}
-                <path d="M50 9 L50 -4" stroke="white" strokeWidth="0.75" strokeLinecap="round" opacity="0.72" />
-                {/* Rays — diagonal */}
-                <path d="M49.2 9.5 L44.5 3.5" stroke="#ffaa90" strokeWidth="0.55" strokeLinecap="round" opacity="0.48" />
-                <path d="M50.8 9.5 L55.5 3.5" stroke="#ffaa90" strokeWidth="0.55" strokeLinecap="round" opacity="0.48" />
-                {/* Rays — horizontal glints */}
-                <path d="M47.5 11 L43 11" stroke="#ff6040" strokeWidth="0.4" strokeLinecap="round" opacity="0.32" />
-                <path d="M52.5 11 L57 11" stroke="#ff6040" strokeWidth="0.4" strokeLinecap="round" opacity="0.32" />
-              </svg>
-
-              <span style={{
-                fontFamily: "'Josefin Sans', 'Futura', system-ui, sans-serif",
-                fontSize: "0.75rem",
-                fontWeight: 300,
-                letterSpacing: "0.32em",
-                color: "#fff",
-                marginTop: "2px",
-                lineHeight: 1,
-                whiteSpace: "nowrap",
-              }}>
-                RECALL<span style={{ color: "#ff3b30" }}>RADAR</span>
-              </span>
-              <div style={{ height: "1px", background: "linear-gradient(90deg, transparent, #ff3b30 30%, #ff3b30 70%, transparent)", width: "94%", marginTop: "5px" }} />
-            </div>
+            <button
+              onClick={() => setView("landing")}
+              aria-label="Back to RecallRadar landing page"
+              style={{ width: "210px", height: "86px", border: 0, padding: 0, background: "transparent", cursor: "pointer", flexShrink: 0 }}
+            >
+              <RecallRadarLogo className="app-nav-logo" />
+            </button>
 
             {/* Nav links */}
             <div style={{ display: "flex", gap: "36px", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.1em" }}>
@@ -717,6 +661,14 @@ export default function App() {
           }}
         />
       )}
+      <style>{`
+        .app-nav-logo {
+          display: block;
+          width: 100%;
+          height: 100%;
+          overflow: visible;
+        }
+      `}</style>
     </div>
   );
 }
