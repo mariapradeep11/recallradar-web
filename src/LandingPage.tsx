@@ -748,7 +748,7 @@ export default function LandingPage({
 
         <aside className="rr-proof-card">
           <div className="rr-proof-visual">
-            <img src="/images/chicken/chicken-recall-specimen.png" alt="Chicken surrounded by recall risk signals" />
+            <img src="/images/chicken/chicken-scanner-specimen.png" alt="Chicken cut surrounded by recall risk signals" />
             <div className="rr-proof-visual-vignette" />
             {chickenProof.signals.map(([label, count], index) => (
               <button
@@ -2091,6 +2091,85 @@ export default function LandingPage({
           bottom: 15%;
           animation-delay: -4s;
         }
+
+        .rr-proof-visual .rr-organism {
+          width: clamp(54px, 4.6vw, 70px);
+          height: clamp(54px, 4.6vw, 70px);
+          border-color: rgba(167, 216, 255, .34);
+          background:
+            radial-gradient(circle at 50% 50%, rgba(255,59,48,.2), transparent 12%),
+            radial-gradient(circle at 50% 50%, rgba(124,194,255,.12), rgba(0,0,0,.18) 64%, transparent 70%);
+          box-shadow: inset 0 0 24px rgba(168,216,255,.08), 0 0 24px rgba(255,59,48,.2), 0 0 34px rgba(107,174,255,.12);
+        }
+
+        .rr-proof-visual .rr-organism::before {
+          inset: -7px;
+          border-color: rgba(167, 216, 255, .18);
+          background: radial-gradient(circle, transparent 58%, rgba(167,216,255,.14) 59%, transparent 62%);
+        }
+
+        .rr-proof-visual .rr-organism::after {
+          inset: 8px;
+          background:
+            conic-gradient(from 20deg, transparent 0 16deg, rgba(167,216,255,.5) 17deg 20deg, transparent 21deg 74deg, rgba(255,59,48,.66) 75deg 78deg, transparent 79deg 360deg);
+        }
+
+        .rr-proof-visual .rr-organism i {
+          width: 34px;
+          height: 15px;
+          border-radius: 58% 42% 54% 46% / 62% 48% 52% 38%;
+          background:
+            radial-gradient(circle at 22% 28%, rgba(255,255,255,.85), transparent 15%),
+            repeating-linear-gradient(90deg, color-mix(in srgb, var(--parasite) 88%, #fff) 0 4px, var(--parasite-dark) 5px 7px),
+            linear-gradient(135deg, var(--parasite), var(--parasite-dark));
+          box-shadow: 0 0 16px var(--parasite-glow);
+          transform: rotate(-18deg);
+        }
+
+        .rr-proof-visual .rr-organism i::before {
+          left: -8px;
+          top: 6px;
+          width: 14px;
+          height: 7px;
+          border-radius: 999px 0 0 999px;
+          border-top: 2px solid var(--parasite);
+          border-left: 2px solid var(--parasite);
+          transform: rotate(-34deg);
+          filter: drop-shadow(0 0 5px var(--parasite-glow));
+        }
+
+        .rr-proof-visual .rr-organism i::after {
+          display: block;
+          right: -11px;
+          top: 6px;
+          width: 16px;
+          height: 11px;
+          border-radius: 50%;
+          border-top: 2px solid var(--parasite);
+          border-right: 2px solid var(--parasite);
+          box-shadow:
+            6px -4px 0 -5px var(--parasite),
+            8px 4px 0 -5px var(--parasite);
+          transform: rotate(24deg);
+          filter: drop-shadow(0 0 5px var(--parasite-glow));
+        }
+
+        .rr-proof-visual .rr-organism b {
+          bottom: -28px;
+          border-color: rgba(167,216,255,.16);
+          background: rgba(0,0,0,.58);
+        }
+
+        .rr-proof-visual .rr-organism em {
+          color: #ff5c52;
+          text-shadow: 0 0 14px rgba(255,59,48,.7);
+        }
+
+        .rr-proof-visual .rr-organism-1 { left: 17%; top: 23%; }
+        .rr-proof-visual .rr-organism-2 { right: 17%; top: 24%; }
+        .rr-proof-visual .rr-organism-3 { left: 12%; bottom: 36%; }
+        .rr-proof-visual .rr-organism-4 { right: 14%; bottom: 31%; }
+        .rr-proof-visual .rr-organism-5 { left: 23%; bottom: 20%; }
 
         @keyframes rrProofScan {
           0%, 100% {
