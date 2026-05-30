@@ -1,27 +1,31 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import RiskIntelligence from "./RiskIntelligence";
 import BarcodeScanner from "./BarcodeScanner";
 import PhotoHero from "./PhotoHero.jsx";
 import FloatingPhotos from "./FloatingPhotos.jsx";
-import LandingPage from "./LandingPage";
 import RecallRadarLogo from "./RecallRadarLogo";
 
-type Category = "food" | "drug" | "device" | "consumer";
+const LandingPage = lazy(() => import("./LandingPage"));
+
+type Category = "food" | "drug" | "device" | "consumer" | "vehicle";
 type Severity = "LOW" | "MEDIUM" | "HIGH";
+type SearchMode = "search" | "monitor";
 
 type Recall = {
+  id?: string;
+  source?: "FDA" | "CPSC" | "NHTSA" | string;
+  category?: Category | string;
   product_description?: string;
   reason_for_recall?: string;
   recalling_firm?: string;
   report_date?: string;
-};
-
-const endpoints: Record<Exclude<Category, "consumer">, string> = {
-  food: "https://api.fda.gov/food/enforcement.json",
-  drug: "https://api.fda.gov/drug/enforcement.json",
-  device: "https://api.fda.gov/device/enforcement.json",
+  recall_number?: string;
+  classification?: string;
+  status?: string;
+  url?: string;
+  remedy?: string;
 };
 
 const categoryLabels: Record<Category, string> = {
@@ -29,6 +33,7 @@ const categoryLabels: Record<Category, string> = {
   drug: "Medicine",
   device: "Medical Devices",
   consumer: "Consumer Products",
+  vehicle: "Vehicles",
 };
 
 const productImages: Record<string, string[]> = {
@@ -135,8 +140,42 @@ const getGuidance = (reason = "") => {
 };
 
 const formatDate = (date?: string) => {
-  if (!date || date.length !== 8) return "N/A";
-  return `${date.slice(4, 6)}/${date.slice(6, 8)}/${date.slice(0, 4)}`;
+  if (!date) return "N/A";
+  if (/^\d{8}$/.test(date)) {
+    return `${date.slice(4, 6)}/${date.slice(6, 8)}/${date.slice(0, 4)}`;
+  }
+  const parsed = new Date(date);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+  }
+  return date;
+};
+
+const sourceName = (category: Category) => {
+  if (category === "consumer") return "CPSC";
+  if (category === "vehicle") return "NHTSA";
+  return "FDA";
+};
+
+const parseVehicleQuery = (value = "") => {
+  const year = value.match(/\b(19|20)\d{2}\b/)?.[0] || "";
+  const rest = value.replace(year, "").trim().split(/\s+/).filter(Boolean);
+  return {
+    year,
+    make: rest[0] || "",
+    model: rest.slice(1).join(" "),
+  };
+};
+
+const buildRecallSearchUrl = (category: Category, searchTerm: string) => {
+  const params = new URLSearchParams({ category, query: searchTerm.trim() });
+  if (category === "vehicle") {
+    const vehicle = parseVehicleQuery(searchTerm);
+    if (vehicle.year) params.set("year", vehicle.year);
+    if (vehicle.make) params.set("make", vehicle.make);
+    if (vehicle.model) params.set("model", vehicle.model);
+  }
+  return `/api/recalls?${params.toString()}`;
 };
 
 export default function App() {
@@ -154,19 +193,28 @@ export default function App() {
   const [expandedWhy, setExpandedWhy] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
 
-  const searchRecalls = async (overrideQuery?: string) => {
+  const searchRecalls = async (overrideQuery?: string, overrideCategory?: Category) => {
     const searchTerm = overrideQuery || query;
+    const searchCategory = overrideCategory || category;
     if (!searchTerm.trim()) return;
     setLoading(true);
     setError("");
     setSearched(true);
     setResults([]);
-    if (category === "consumer") { setLoading(false); return; }
     try {
-      const url = `${endpoints[category]}?search=${encodeURIComponent(searchTerm.trim())}&limit=10`;
+      const url = buildRecallSearchUrl(searchCategory, searchTerm);
       const res = await fetch(url);
       const data = await res.json();
-      if (!res.ok) { setResults([]); setError(""); return; }
+      if (!res.ok) {
+        setResults([]);
+        setError(data?.error || `${sourceName(searchCategory)} search is temporarily unavailable.`);
+        return;
+      }
+      if (data.needsVehicleFields) {
+        setResults([]);
+        setError("Enter a vehicle as year, make, and model, for example: 2021 Toyota Camry.");
+        return;
+      }
       setResults(data.results || []);
     } catch (err) {
       console.error(err);
@@ -180,14 +228,17 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedQuery = params.get("q");
+    const sharedCategory = params.get("cat") as Category | null;
     if (sharedQuery) {
+      const initialCategory = sharedCategory && categoryLabels[sharedCategory] ? sharedCategory : "food";
       setQuery(sharedQuery);
-      setTimeout(() => searchRecalls(sharedQuery), 250);
+      setCategory(initialCategory);
+      setTimeout(() => searchRecalls(sharedQuery, initialCategory), 250);
     }
   }, []);
 
   const buildShareUrl = (recall: Recall) => {
-    const params = new URLSearchParams({ q: query || recall.product_description || "", product: recall.product_description || "" });
+    const params = new URLSearchParams({ q: query || recall.product_description || "", cat: category, product: recall.product_description || "" });
     return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
   };
 
@@ -206,22 +257,42 @@ export default function App() {
   const joinWaitlist = async () => {
     if (!email.trim() || !isValidEmail(email)) { alert("Enter a valid email"); return; }
     try {
-      const res = await fetch("https://api.sheetbest.com/sheets/a5c4ecd4-7684-48f7-9cd0-8ccf090c0b7a", {
+      const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), product: selectedProduct, category, search_query: query, source: "premium_modal", timestamp: new Date().toISOString() }),
+        body: JSON.stringify({ email: email.trim(), product: selectedProduct, category, search_query: query, source: "premium_modal", intent: "monitor_product", page: "app" }),
       });
-      if (!res.ok) { const t = await res.text(); console.error("Sheet.best error:", res.status, t); alert(`Could not save email. Error ${res.status}`); return; }
+      if (!res.ok) { const t = await res.text(); console.error("Waitlist error:", res.status, t); alert(`Could not save email. Error ${res.status}`); return; }
       setJoined(true);
     } catch (err) { console.error(err); alert("Something went wrong"); }
   };
 
   if (view === "landing") {
+    const launchFromLanding = ({ query: landingQuery = "", category: landingCategory = "food", mode = "search" }: { query?: string; category?: Category; mode?: SearchMode } = {}) => {
+      setCategory(landingCategory);
+      setQuery(landingQuery);
+      setView("app");
+      setResults([]);
+      setSearched(false);
+      setError("");
+
+      if (mode === "monitor") {
+        setSelectedProduct(landingQuery || "this product");
+        return;
+      }
+
+      if (landingQuery.trim()) {
+        setTimeout(() => searchRecalls(landingQuery, landingCategory), 150);
+      }
+    };
+
     return (
-      <LandingPage
-        onLaunch={() => setView("app")}
-        onCategory={(cat) => { setCategory(cat as Category); setView("app"); }}
-      />
+      <Suspense fallback={<div style={{ minHeight: "100vh", background: "#000", color: "#fff" }} />}>
+        <LandingPage
+          onLaunch={launchFromLanding}
+          onCategory={(cat) => launchFromLanding({ category: cat as Category })}
+        />
+      </Suspense>
     );
   }
 
@@ -344,6 +415,13 @@ export default function App() {
                 <span style={{ display: "flex", alignItems: "center", paddingRight: "12px", color: "rgba(255,255,255,0.18)", fontSize: "0.75rem", letterSpacing: "0.06em", flexShrink: 0, pointerEvents: "none" }}>⌘K</span>
                 <button
                   type="button"
+                  onClick={() => searchRecalls()}
+                  style={{ background: "#ff3b30", border: "none", color: "#fff", padding: "0 18px", cursor: "pointer", fontWeight: 900, fontFamily: "inherit", flexShrink: 0 }}
+                >
+                  Search
+                </button>
+                <button
+                  type="button"
                   onClick={() => setShowScanner(true)}
                   title="Scan barcode"
                   style={{ background: "#ff3b30", border: "none", color: "#fff", padding: "0 20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
@@ -377,13 +455,13 @@ export default function App() {
 
               {loading && (
                 <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "0.82rem", marginTop: "12px" }}>
-                  Searching FDA database...
+                  Searching {sourceName(category)} recall data...
                 </p>
               )}
 
               {/* Category pills */}
               <div style={{ marginTop: "20px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {(["food", "drug", "device", "consumer"] as Category[]).map((c) => (
+                {(["food", "drug", "device", "consumer", "vehicle"] as Category[]).map((c) => (
                   <button
                     key={c}
                     onClick={() => { setCategory(c); setResults([]); setSearched(false); setError(""); }}
@@ -424,16 +502,18 @@ export default function App() {
           <section style={{ marginTop: "40px", padding: "28px", borderRadius: "20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(10px)" }}>
             <p style={{ color: "#ffb4ae", fontSize: "12px", marginBottom: "10px", fontWeight: 900 }}>BROADER SAFETY SIGNALS</p>
             <h3 style={{ marginBottom: "10px" }}>
-              {category === "consumer" ? "Checking real-world safety signals" : "No FDA match — expanding your search"}
+              {category === "vehicle" ? "No NHTSA match found" : category === "consumer" ? "No CPSC match found" : "No FDA match - expanding your search"}
             </h3>
             <p style={{ color: "#aaa", lineHeight: 1.6 }}>
-              {category === "consumer"
-                ? "Consumer product risks often appear in recalls, news reports, and manufacturer notices before centralized databases catch up."
-                : "This product may still have safety risks. Check official consumer-product, news, and manufacturer sources below."}
+              {category === "vehicle"
+                ? "Try a full year, make, and model. VIN-specific checks should still be confirmed with NHTSA or the manufacturer."
+                : category === "consumer"
+                  ? "Try a product type, brand, or model number. You can also check official CPSC and manufacturer notices below."
+                  : "This product may still have safety risks. Check official consumer-product, news, and manufacturer sources below."}
             </p>
             <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
-              <a href={`https://www.cpsc.gov/Recalls?search=${encodeURIComponent(query)}`} target="_blank" rel="noreferrer" style={linkCardStyle}>
-                <div><strong>Consumer Product Safety</strong><p style={subtleText}>Official CPSC recall database</p></div>
+              <a href={category === "vehicle" ? "https://www.nhtsa.gov/recalls" : `https://www.cpsc.gov/Recalls?search=${encodeURIComponent(query)}`} target="_blank" rel="noreferrer" style={linkCardStyle}>
+                <div><strong>{category === "vehicle" ? "NHTSA recall lookup" : "Consumer Product Safety"}</strong><p style={subtleText}>{category === "vehicle" ? "Official vehicle recall database" : "Official CPSC recall database"}</p></div>
                 <span style={arrowStyle}>→</span>
               </a>
               <a href={`https://www.google.com/search?q=${encodeURIComponent(query + " recall news")}&tbm=nws`} target="_blank" rel="noreferrer" style={linkCardStyle}>
@@ -521,7 +601,7 @@ export default function App() {
                       plainEnglishSummary: r.reason_for_recall || "Potential product safety issue detected.",
                     }}
                     loading={false}
-                    source="FDA"
+                    source={r.source || sourceName(category)}
                     date={formatDate(r.report_date)}
                   />
 
@@ -597,7 +677,7 @@ export default function App() {
         </section>
 
         <footer style={{ color: "#444", textAlign: "center", margin: "60px 0 28px", fontSize: "0.82rem", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "28px" }}>
-          RecallRadar is not affiliated with the FDA. Data provided as-is.
+          RecallRadar is not affiliated with FDA, CPSC, or NHTSA. Official data is provided as-is.
         </footer>
       </div>
 

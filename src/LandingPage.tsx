@@ -7,7 +7,8 @@ import * as THREE from "three";
 import RecallRadarLogo from "./RecallRadarLogo";
 import chickenInsights from "../data/source-intelligence/chicken-insights.json";
 
-type Category = "food" | "drug" | "device" | "consumer";
+type Category = "food" | "drug" | "device" | "consumer" | "vehicle";
+type SearchMode = "search" | "monitor";
 
 function Logo() {
   return (
@@ -480,7 +481,7 @@ export default function LandingPage({
   onLaunch,
   onCategory,
 }: {
-  onLaunch: () => void;
+  onLaunch: (payload?: { query?: string; category?: Category; mode?: SearchMode }) => void;
   onCategory: (cat: Category) => void;
 }) {
   const [email, setEmail] = useState("");
@@ -492,17 +493,26 @@ export default function LandingPage({
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [proofRevealed, setProofRevealed] = useState(false);
 
+  const launchCommand = () => {
+    onLaunch({
+      query: heroQuery.trim() || activeCategory.example,
+      category: activeCategory.cat,
+      mode: commandMode,
+    });
+  };
+
   const joinWaitlist = async () => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       alert("Enter a valid email");
       return;
     }
     try {
-      await fetch("https://api.sheetbest.com/sheets/a5c4ecd4-7684-48f7-9cd0-8ccf090c0b7a", {
+      const response = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), source: "landing_hero", timestamp: new Date().toISOString() }),
+        body: JSON.stringify({ email: email.trim(), source: "landing_hero", intent: "early_access", page: "landing" }),
       });
+      if (!response.ok) throw new Error("Waitlist request failed");
       setJoined(true);
     } catch {
       alert("Something went wrong. Try again.");
@@ -514,7 +524,7 @@ export default function LandingPage({
     { label: "Medicine", cat: "drug", icon: "drug", source: "FDA", example: "ibuprofen" },
     { label: "Medical Devices", cat: "device", icon: "device", source: "FDA", example: "syringe" },
     { label: "Consumer Products", cat: "consumer", icon: "consumer", source: "CPSC", example: "air fryer" },
-    { label: "Vehicles", cat: "consumer", icon: "vehicle", source: "NHTSA", example: "2021 Toyota Camry" },
+    { label: "Vehicles", cat: "vehicle", icon: "vehicle", source: "NHTSA", example: "2021 Toyota Camry" },
   ];
 
   const activeCategory = categories[activeCategoryIndex];
@@ -573,6 +583,7 @@ export default function LandingPage({
     }),
     classes: chickenInsights.byClassification,
     signals: chickenInsights.topRiskKeywords.slice(0, 5),
+    cappedAt: chickenInsights.cappedAt,
   };
 
   return (
@@ -594,7 +605,7 @@ export default function LandingPage({
             ))}
           </nav>
           <div className="rr-actions">
-            <button className="rr-signin" onClick={onLaunch}>Sign in</button>
+            <button className="rr-signin" onClick={() => onLaunch()}>Sign in</button>
             <button className="rr-outline" onClick={() => setShowEmail((value) => !value)}>
               Join early access <ArrowIcon />
             </button>
@@ -641,11 +652,11 @@ export default function LandingPage({
                 <input
                   value={heroQuery}
                   onChange={(event) => setHeroQuery(event.target.value)}
-                  onKeyDown={(event) => event.key === "Enter" && onLaunch()}
+                  onKeyDown={(event) => event.key === "Enter" && launchCommand()}
                   placeholder={commandPlaceholder}
                   aria-label="Search recalls"
                 />
-                <button className="rr-search-action" onClick={onLaunch}>
+                <button className="rr-search-action" onClick={launchCommand}>
                   <span>{commandMode === "monitor" ? "Join monitoring" : "Explore intelligence"}</span>
                   <ArrowIcon />
                 </button>
@@ -705,8 +716,8 @@ export default function LandingPage({
               onClick={() => {
                 setActiveCategoryIndex(index);
                 setPlaceholderIndex(index);
+                onCategory(category.cat);
               }}
-              onDoubleClick={() => onCategory(category.cat)}
             >
               <span className="rr-category-icon"><CategoryIcon name={category.icon} /></span>
               <span className="rr-category-copy">
@@ -736,13 +747,13 @@ export default function LandingPage({
           <p className="rr-section-kicker">WHAT THE LABEL DOESN'T TELL YOU</p>
           <h2 id="proof-title">Your food can look normal. The recall record tells another story.</h2>
           <p>
-            A search for chicken surfaces hundreds of official FDA enforcement records across Listeria, Salmonella, undeclared allergens, plastic, and other signals. RecallRadar turns that hidden public record into something a household can understand.
+            A snapshot search for chicken surfaced hundreds of official FDA enforcement records across Listeria, Salmonella, undeclared allergens, plastic, and other signals. RecallRadar turns that hidden public record into something a household can understand.
           </p>
           <div className="rr-proof-actions">
             <button className="rr-primary rr-proof-primary" onClick={() => setProofRevealed((value) => !value)}>
               {proofRevealed ? "Hide recall layer" : "Reveal the recall layer"} <ArrowIcon />
             </button>
-            <button className="rr-proof-link" onClick={onLaunch}>Search a product <ArrowIcon /></button>
+            <button className="rr-proof-link" onClick={() => onLaunch({ query: "chicken", category: "food", mode: "search" })}>Search a product <ArrowIcon /></button>
           </div>
         </div>
 
@@ -763,7 +774,7 @@ export default function LandingPage({
                 <small>
                   FDA food enforcement
                   <br />
-                  {count} matches in {chickenProof.pulled.toLocaleString()} pulled records
+                  {count} matches in {chickenProof.pulled.toLocaleString()} analyzed records
                 </small>
               </button>
             ))}
@@ -797,7 +808,7 @@ export default function LandingPage({
                     </div>
                   ))}
                 </div>
-                <small>FDA openFDA Food Enforcement API • pulled {chickenProof.pulled.toLocaleString()} records • {chickenProof.generatedAt}</small>
+                <small>FDA openFDA Food Enforcement API • snapshot generated {chickenProof.generatedAt} • analyzed {chickenProof.pulled.toLocaleString()} of {chickenProof.total.toLocaleString()} official matches{chickenProof.cappedAt ? ` • capped at ${chickenProof.cappedAt.toLocaleString()} records` : ""}</small>
               </motion.div>
             )}
           </AnimatePresence>
@@ -915,7 +926,7 @@ export default function LandingPage({
         <h2>Know before it hurts you.</h2>
         <p>Search recalls now, or join early access for household monitoring as RecallRadar expands.</p>
         <div>
-          <button className="rr-primary rr-final-primary" onClick={onLaunch}>Explore intelligence <ArrowIcon /></button>
+          <button className="rr-primary rr-final-primary" onClick={() => onLaunch()}>Explore intelligence <ArrowIcon /></button>
           <button className="rr-outline" onClick={() => setShowEmail((value) => !value)}>Join early access <ArrowIcon /></button>
         </div>
       </section>
