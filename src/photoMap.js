@@ -135,7 +135,7 @@ const departmentKeywords = {
 
   vehicle_tires: ["tire", "tires"],
   vehicle_brakes: ["brake", "brakes"],
-  vehicle_airbag: ["airbag", "steering wheel"],
+  vehicle_airbag: ["airbag", "air bag", "air bags", "steering wheel", "occupant classification", "ocs", "passenger air bag"],
   vehicle_battery: ["battery", "electric vehicle", "ev"],
   vehicle_lights: ["headlight", "tail light", "lamp"],
   vehicle_car: ["car", "vehicle", "toyota", "honda", "ford", "tesla", "mazda", "chevrolet", "bmw"],

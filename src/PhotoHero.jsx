@@ -5,6 +5,22 @@ import { resolveAllPhotos, preloadPhoto, categoryGlow } from "./photoMap.js";
 
 const DEFAULT_PHOTO = "/images/chicken/chicken-01.jpg";
 
+const sourceLabels = {
+  food: "FDA Database Match",
+  drug: "FDA Database Match",
+  device: "FDA Database Match",
+  consumer: "CPSC Database Match",
+  vehicle: "NHTSA Database Match",
+};
+
+const detectionLabels = {
+  food: "Product Detected",
+  drug: "Product Detected",
+  device: "Device Detected",
+  consumer: "Product Detected",
+  vehicle: "Vehicle Detected",
+};
+
 function TargetOrbit({ color = "#ff3b30" }) {
   const outerRingRef = useRef();
   const dotRef = useRef();
@@ -105,16 +121,17 @@ export default function PhotoHero({
   query = "",
   category = "food",
 }) {
-  const [photo, setPhoto] = useState(DEFAULT_PHOTO);
+  const defaultPhoto = category === "vehicle" ? resolveAllPhotos("vehicle", "vehicle")[0] : DEFAULT_PHOTO;
+  const [photo, setPhoto] = useState(defaultPhoto);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [scrollY, setScrollY] = useState(0);
 
   const glow = categoryGlow[category] || categoryGlow.food;
 
   const photos = useMemo(() => {
-    if (!query.trim()) return [DEFAULT_PHOTO];
+    if (!query.trim()) return [defaultPhoto];
     return resolveAllPhotos(query, category);
-  }, [query, category]);
+  }, [query, category, defaultPhoto]);
 
   useEffect(() => {
     const first = photos[0];
@@ -198,7 +215,7 @@ export default function PhotoHero({
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <div style={{ width: "6px", height: "6px", borderRadius: "999px", background: glow.primary, flexShrink: 0, boxShadow: `0 0 6px ${glow.primary}` }} />
           <div>
-            <strong style={{ color: "#fff", fontSize: "0.72rem", display: "block", letterSpacing: "0.1em" }}>Product Detected</strong>
+            <strong style={{ color: "#fff", fontSize: "0.72rem", display: "block", letterSpacing: "0.1em" }}>{detectionLabels[category] || "Product Detected"}</strong>
             <span style={{ color: "rgba(255,255,255,0.38)", marginTop: "3px", display: "block" }}>93% Confidence</span>
           </div>
         </div>
@@ -207,7 +224,7 @@ export default function PhotoHero({
           <strong style={{ color: "#fff", fontSize: "0.72rem", display: "block", letterSpacing: "0.1em" }}>
             {query || "Chicken — Poultry"}
           </strong>
-          <span style={{ color: glow.primary, marginTop: "3px", display: "block" }}>FDA Database Match</span>
+          <span style={{ color: glow.primary, marginTop: "3px", display: "block" }}>{sourceLabels[category] || "Official Database Match"}</span>
         </div>
       </div>
 

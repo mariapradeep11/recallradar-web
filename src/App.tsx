@@ -6,6 +6,7 @@ import BarcodeScanner from "./BarcodeScanner";
 import PhotoHero from "./PhotoHero.jsx";
 import FloatingPhotos from "./FloatingPhotos.jsx";
 import RecallRadarLogo from "./RecallRadarLogo";
+import { resolvePhoto } from "./photoMap.js";
 
 const LandingPage = lazy(() => import("./LandingPage"));
 
@@ -54,11 +55,14 @@ const productImages: Record<string, string[]> = {
   ],
 };
 
-const getProductImage = (description = "", index = 0) => {
+const getProductImage = (description = "", index = 0, itemCategory: Category | string = "food") => {
+  if (itemCategory === "vehicle") {
+    return resolvePhoto(description, "vehicle");
+  }
   const text = description.toLowerCase();
   if (text.includes("chicken")) return productImages.chicken[index % productImages.chicken.length];
   if (text.includes("milk")) return productImages.milk[index % productImages.milk.length];
-  return "/images/chicken/chicken-01.jpg";
+  return resolvePhoto(description, itemCategory as Category);
 };
 
 const linkCardStyle: CSSProperties = {
@@ -96,16 +100,31 @@ const highlight = (text = "", query: string) => {
   );
 };
 
-const getSeverity = (reason?: string): Severity => {
+const getSeverity = (reason?: string, itemCategory?: Category | string): Severity => {
   if (!reason) return "LOW";
   const n = reason.toLowerCase();
+  if (itemCategory === "vehicle") {
+    if (n.includes("air bag") || n.includes("airbag") || n.includes("brake") || n.includes("crash") || n.includes("fire") || n.includes("injury") || n.includes("death") || n.includes("fuel") || n.includes("stall")) return "HIGH";
+    return "MEDIUM";
+  }
   if (n.includes("listeria") || n.includes("salmonella") || n.includes("death") || n.includes("seizure") || n.includes("contamination") || n.includes("serious injury")) return "HIGH";
   if (n.includes("undeclared") || n.includes("allergen") || n.includes("metal") || n.includes("glass") || n.includes("chemical") || n.includes("fall") || n.includes("burn")) return "MEDIUM";
   return "LOW";
 };
 
-const getGuidance = (reason = "") => {
+const getGuidance = (reason = "", itemCategory?: Category | string) => {
   const r = reason.toLowerCase();
+  if (itemCategory === "vehicle") {
+    return {
+      label: "Vehicle safety recall",
+      actions: [
+        "Confirm your exact vehicle with a VIN lookup",
+        "Contact a Toyota dealer or the manufacturer for repair status",
+        "Ask whether recall service is available before driving long distances",
+        "Save this vehicle so future NHTSA matches can be monitored",
+      ],
+    };
+  }
   if (r.includes("salmonella") || r.includes("listeria") || r.includes("contamination")) {
     return {
       label: "Potential illness risk",
@@ -144,9 +163,19 @@ const formatDate = (date?: string) => {
   if (/^\d{8}$/.test(date)) {
     return `${date.slice(4, 6)}/${date.slice(6, 8)}/${date.slice(0, 4)}`;
   }
+  const slashDate = date.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDate) {
+    const [, first, second, year] = slashDate;
+    const month = Number(first) > 12 ? second : first;
+    const day = Number(first) > 12 ? first : second;
+    const parsedSlashDate = new Date(Number(year), Number(month) - 1, Number(day));
+    if (!Number.isNaN(parsedSlashDate.getTime())) {
+      return parsedSlashDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+  }
   const parsed = new Date(date);
   if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+    return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   }
   return date;
 };
@@ -156,6 +185,30 @@ const sourceName = (category: Category) => {
   if (category === "vehicle") return "NHTSA";
   return "FDA";
 };
+
+const getOfficialRecallUrl = (recall: Recall) => {
+  if (recall.category === "vehicle" || recall.source === "NHTSA") {
+    return recall.recall_number
+      ? `https://www.nhtsa.gov/recalls?nhtsaId=${encodeURIComponent(recall.recall_number)}`
+      : "https://www.nhtsa.gov/recalls";
+  }
+  return recall.url || `https://www.google.com/search?q=${encodeURIComponent(`${recall.recalling_firm || ""} recall`)}`;
+};
+
+const getVehicleIssueLabel = (recall: Recall) => {
+  const text = `${recall.classification || ""} ${recall.reason_for_recall || ""}`.toLowerCase();
+  if (text.includes("air bag") || text.includes("airbag") || text.includes("occupant classification")) return "Airbag system";
+  if (text.includes("brake")) return "Brake system";
+  if (text.includes("tire")) return "Tires";
+  if (text.includes("fuel")) return "Fuel system";
+  if (text.includes("battery")) return "Battery / electrical";
+  if (text.includes("light") || text.includes("lamp")) return "Lighting";
+  return recall.classification || "Vehicle safety system";
+};
+
+const getVehicleRiskLabel = (severity: Severity) => (
+  severity === "HIGH" ? "URGENT SAFETY RECALL" : "SAFETY RECALL"
+);
 
 const parseVehicleQuery = (value = "") => {
   const year = value.match(/\b(19|20)\d{2}\b/)?.[0] || "";
@@ -530,10 +583,18 @@ export default function App() {
 
         <section style={{ marginTop: "40px" }}>
           {results.map((r, i) => {
-            const severity = getSeverity(r.reason_for_recall);
-            const guidance = getGuidance(r.reason_for_recall);
+            const resultCategory = (r.category || category) as Category;
+            const isVehicle = resultCategory === "vehicle";
+            const severity = getSeverity(r.reason_for_recall, resultCategory);
+            const guidance = getGuidance(r.reason_for_recall, resultCategory);
             const cardId = `${r.report_date}-${r.recalling_firm}-${i}`;
             const isExpanded = expandedWhy === cardId;
+            const imageQuery = isVehicle
+              ? `${r.classification || ""} ${r.reason_for_recall || ""} ${r.product_description || query}`
+              : r.product_description || query;
+            const riskLabel = isVehicle ? getVehicleRiskLabel(severity) : `${severity} RISK`;
+            const vehicleIssueLabel = isVehicle ? getVehicleIssueLabel(r) : "";
+            const officialRecallUrl = getOfficialRecallUrl(r);
 
             return (
               <motion.div
@@ -558,17 +619,39 @@ export default function App() {
                   {/* Product image */}
                   <div style={{ position: "relative", width: "100%", height: "210px", borderRadius: "20px", overflow: "hidden", marginBottom: "20px", background: "#111", border: "1px solid rgba(255,255,255,0.07)" }}>
                     <img
-                      src={getProductImage(r.product_description, i)}
+                      src={getProductImage(imageQuery, i, resultCategory)}
                       alt={r.product_description || "Product"}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", filter: "brightness(0.9) saturate(1.05)", transform: "scale(1.02)" }}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", filter: isVehicle ? "brightness(0.68) saturate(0.86)" : "brightness(0.9) saturate(1.05)", transform: "scale(1.02)" }}
                     />
-                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.48), rgba(0,0,0,0.02))" }} />
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                      <div style={{ width: "120px", height: "120px", borderRadius: "999px", border: "1px solid rgba(255,255,255,0.18)", boxShadow: "0 0 24px rgba(255,255,255,0.16)", animation: "pulse 3s infinite" }} />
-                    </div>
+                    <div style={{ position: "absolute", inset: 0, background: isVehicle ? "linear-gradient(90deg, rgba(0,0,0,0.78), rgba(0,0,0,0.22)), linear-gradient(to top, rgba(0,0,0,0.68), rgba(0,0,0,0.04))" : "linear-gradient(to top, rgba(0,0,0,0.48), rgba(0,0,0,0.02))" }} />
+                    {!isVehicle && (
+                      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                        <div style={{ width: "120px", height: "120px", borderRadius: "999px", border: "1px solid rgba(255,255,255,0.18)", boxShadow: "0 0 24px rgba(255,255,255,0.16)", animation: "pulse 3s infinite" }} />
+                      </div>
+                    )}
                     <div style={{ position: "absolute", top: "14px", left: "14px", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.08)", padding: "9px 12px", borderRadius: "14px", color: "#fff", fontWeight: 800, fontSize: "0.74rem", letterSpacing: "0.04em" }}>
-                      SCAN DETECTED
+                      {isVehicle ? "NHTSA MATCH" : "SCAN DETECTED"}
                     </div>
+                    {isVehicle && (
+                      <div style={{ position: "absolute", left: "18px", right: "18px", bottom: "16px", display: "grid", gap: "12px" }}>
+                        <div>
+                          <p style={{ margin: "0 0 8px", color: "#30d158", fontSize: "0.74rem", fontWeight: 900, letterSpacing: "0.12em" }}>VEHICLE RECALL DOSSIER</p>
+                          <h4 style={{ margin: 0, fontSize: "1.55rem", lineHeight: 1.1 }}>{shortText(r.product_description || query, 90)}</h4>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "10px" }}>
+                          {[
+                            ["System", vehicleIssueLabel],
+                            ["Campaign", r.recall_number || "NHTSA"],
+                            ["Next step", "Confirm by VIN"],
+                          ].map(([label, value]) => (
+                            <div key={label} style={{ padding: "10px 12px", borderRadius: "14px", background: "rgba(0,0,0,0.48)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                              <div style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.68rem", fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</div>
+                              <div style={{ marginTop: "4px", color: "#fff", fontWeight: 850, fontSize: "0.86rem" }}>{shortText(value, 34)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Severity badge */}
@@ -578,7 +661,7 @@ export default function App() {
                     color: severity === "HIGH" ? "#ff3b30" : severity === "MEDIUM" ? "#ff9500" : "#aaa",
                     padding: "6px 11px", borderRadius: "999px", fontSize: "12px", fontWeight: 900, marginBottom: "12px",
                   }}>
-                    ⚠️ {severity} RISK
+                    ⚠️ {riskLabel}
                   </div>
 
                   <h3 style={{ fontSize: "1.3rem", lineHeight: 1.35, marginBottom: "12px" }}>
@@ -594,15 +677,30 @@ export default function App() {
                   <RiskIntelligence
                     risk={{
                       riskLevel: severity,
-                      why: [r.reason_for_recall || "Recall hazard detected"],
-                      reportedImpact: "Official recall detected from government safety source.",
+                      contextualLabel: riskLabel,
+                      riskQualifier: isVehicle ? "Vehicle matches by year, make, and model should be confirmed with a VIN lookup." : undefined,
+                      why: isVehicle
+                        ? [
+                          "Official NHTSA recall match",
+                          `${vehicleIssueLabel} flagged`,
+                          "Exact eligibility depends on VIN",
+                        ]
+                        : [r.reason_for_recall || "Recall hazard detected"],
+                      reportedImpact: isVehicle ? "NHTSA recall detected. Injury or incident counts were not found in the available recall summary." : "Official recall detected from government safety source.",
                       recommendedAction: guidance.actions?.[0] || "Review official recall instructions.",
                       confidence: "High",
-                      plainEnglishSummary: r.reason_for_recall || "Potential product safety issue detected.",
+                      plainEnglishSummary: isVehicle ? "This vehicle may be covered by an official safety campaign. Confirm with VIN before deciding your exact next step." : r.reason_for_recall || "Potential product safety issue detected.",
                     }}
                     loading={false}
                     source={r.source || sourceName(category)}
                     date={formatDate(r.report_date)}
+                    sourceContext={isVehicle ? {
+                      sourceName: "NHTSA",
+                      sourceType: "Official vehicle recall data",
+                      sourceUrl: officialRecallUrl,
+                      checkedFields: ["year", "make", "model", "campaign number", "component", "summary"],
+                      note: "Vehicle recall matches should be confirmed with VIN or license plate lookup.",
+                    } : undefined}
                   />
 
                   {/* What to do */}
@@ -625,7 +723,7 @@ export default function App() {
                       onClick={() => setExpandedWhy(isExpanded ? null : cardId)}
                       style={{ marginTop: "14px", padding: "10px 12px", borderRadius: "12px", background: "transparent", border: "1px solid rgba(255,255,255,0.13)", color: "#ddd", cursor: "pointer", fontWeight: 800, fontFamily: "inherit" }}
                     >
-                      {isExpanded ? "Hide explanation" : "Why is this dangerous?"}
+                      {isExpanded ? "Hide explanation" : isVehicle ? "Why confirm by VIN?" : "Why is this dangerous?"}
                     </button>
                     <AnimatePresence>
                       {isExpanded && (
@@ -635,14 +733,16 @@ export default function App() {
                             <strong style={{ color: "#fff" }}>{r.reason_for_recall || "No reason provided."}</strong>
                           </p>
                           <p style={{ color: "#888", lineHeight: 1.6, marginTop: "8px" }}>
-                            For return or refund details, check the store where you purchased it or contact the recalling company.
+                            {isVehicle
+                              ? "A year/make/model search can find matching safety campaigns, but VIN lookup confirms whether your exact vehicle is included and whether the repair is open."
+                              : "For return or refund details, check the store where you purchased it or contact the recalling company."}
                           </p>
                           <a
-                            href={`https://www.google.com/search?q=${encodeURIComponent(`${r.recalling_firm || ""} recall contact return refund`)}`}
+                            href={isVehicle ? officialRecallUrl : `https://www.google.com/search?q=${encodeURIComponent(`${r.recalling_firm || ""} recall contact return refund`)}`}
                             target="_blank" rel="noreferrer"
                             style={{ color: "#ffb4ae", fontWeight: 800 }}
                           >
-                            Find return/contact info →
+                            {isVehicle ? "Open NHTSA recall lookup →" : "Find return/contact info →"}
                           </a>
                         </motion.div>
                       )}
@@ -661,8 +761,18 @@ export default function App() {
                       onClick={() => openPremiumModal(r.product_description)}
                       style={{ padding: "13px 17px", borderRadius: "13px", background: "#ff3b30", border: "none", color: "#fff", fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}
                     >
-                      🛡 Protect me from this in the future
+                      🛡 {isVehicle ? "Save vehicle alerts" : "Protect me from this in the future"}
                     </button>
+                    {isVehicle && (
+                      <a
+                        href={officialRecallUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ padding: "13px 17px", borderRadius: "13px", background: "rgba(48,209,88,0.14)", border: "1px solid rgba(48,209,88,0.28)", color: "#b8ffd0", fontWeight: 900, textDecoration: "none" }}
+                      >
+                        Check VIN on NHTSA
+                      </a>
+                    )}
                     <button
                       onClick={() => shareRecall(r)}
                       style={{ padding: "13px 17px", borderRadius: "13px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.11)", color: "#ddd", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}
