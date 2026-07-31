@@ -10,6 +10,20 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+
+  /* Editorial Warm — design tokens */
+  --rr-bg: #0c0b0a;
+  --rr-surface: rgba(247,243,238,0.045);
+  --rr-surface-2: rgba(247,243,238,0.07);
+  --rr-border: rgba(247,243,238,0.1);
+  --rr-text: #f7f3ee;
+  --rr-text-soft: rgba(247,243,238,0.58);
+  --rr-text-muted: rgba(247,243,238,0.32);
+  --rr-accent: #c65b45;
+  --rr-accent-strong: #e4a396;
+  --rr-alert: #ff3b30;
+  --rr-caution: #d9a441;
+  --rr-safe: #5c8a5c;
 }
 
 html {
@@ -18,8 +32,8 @@ html {
 
 body {
   margin: 0;
-  background: #050505;
-  color: #fff;
+  background: var(--rr-bg);
+  color: var(--rr-text);
 }
 
 #root {
@@ -32,7 +46,7 @@ body {
 }
 
 h1, h2, h3 {
-  color: #fff;
+  color: var(--rr-text);
   margin: 0;
 }
 

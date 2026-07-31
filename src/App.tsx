@@ -3,10 +3,12 @@ import type { CSSProperties } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import RiskIntelligence from "./RiskIntelligence";
 import BarcodeScanner from "./BarcodeScanner";
+import HistoryPanel from "./HistoryPanel.jsx";
 import PhotoHero from "./PhotoHero.jsx";
 import FloatingPhotos from "./FloatingPhotos.jsx";
 import RecallRadarLogo from "./RecallRadarLogo";
 import { resolvePhoto } from "./photoMap.js";
+import { useHistory } from "./useHistory.js";
 
 const LandingPage = lazy(() => import("./LandingPage"));
 
@@ -71,14 +73,14 @@ const linkCardStyle: CSSProperties = {
   alignItems: "center",
   padding: "14px",
   borderRadius: "12px",
-  border: "1px solid rgba(255,255,255,0.08)",
+  border: "1px solid rgba(247,243,238,0.09)",
   textDecoration: "none",
-  color: "#fff",
-  background: "rgba(255,255,255,0.02)",
+  color: "#f7f3ee",
+  background: "rgba(247,243,238,0.02)",
 };
 
-const subtleText: CSSProperties = { fontSize: "12px", color: "#888", marginTop: "2px" };
-const arrowStyle: CSSProperties = { color: "#ff3b30" };
+const subtleText: CSSProperties = { fontSize: "12px", color: "rgba(247,243,238,0.4)", marginTop: "2px" };
+const arrowStyle: CSSProperties = { color: "#c65b45" };
 
 const shortText = (text?: string, limit = 140) =>
   text && text.length > limit ? text.slice(0, limit).trim() + "..." : text || "";
@@ -93,7 +95,7 @@ const highlight = (text = "", query: string) => {
   const regex = new RegExp(`(${safeQuery})`, "gi");
   return text.split(regex).map((part, i) =>
     part.toLowerCase() === query.trim().toLowerCase() ? (
-      <span key={i} style={{ background: "#ff3b30", color: "#fff", padding: "2px 5px", borderRadius: "5px" }}>{part}</span>
+      <span key={i} style={{ background: "#c65b45", color: "#fbf1ec", padding: "2px 5px", borderRadius: "5px" }}>{part}</span>
     ) : (
       part
     )
@@ -243,8 +245,13 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [joined, setJoined] = useState(false);
   const [copied, setCopied] = useState("");
-  const [expandedWhy, setExpandedWhy] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const {
+    searchHistory, savedSearches, alertHistory,
+    logSearch, toggleSaved, isSaved, logAlert, clearHistory, clearSaved,
+  } = useHistory();
 
   const searchRecalls = async (overrideQuery?: string, overrideCategory?: Category) => {
     const searchTerm = overrideQuery || query;
@@ -268,7 +275,9 @@ export default function App() {
         setError("Enter a vehicle as year, make, and model, for example: 2021 Toyota Camry.");
         return;
       }
-      setResults(data.results || []);
+      const hits: Recall[] = data.results || [];
+      setResults(hits);
+      logSearch(searchTerm, searchCategory, hits.length);
     } catch (err) {
       console.error(err);
       setResults([]);
@@ -276,6 +285,12 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRunSearch = (q: string, c: Category) => {
+    setQuery(q);
+    setCategory(c);
+    searchRecalls(q, c);
   };
 
   useEffect(() => {
@@ -288,6 +303,7 @@ export default function App() {
       setCategory(initialCategory);
       setTimeout(() => searchRecalls(sharedQuery, initialCategory), 250);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const buildShareUrl = (recall: Recall) => {
@@ -340,7 +356,7 @@ export default function App() {
     };
 
     return (
-      <Suspense fallback={<div style={{ minHeight: "100vh", background: "#000", color: "#fff" }} />}>
+      <Suspense fallback={<div style={{ minHeight: "100vh", background: "#0c0b0a", color: "#f7f3ee" }} />}>
         <LandingPage
           onLaunch={launchFromLanding}
           onCategory={(cat) => launchFromLanding({ category: cat as Category })}
@@ -350,13 +366,13 @@ export default function App() {
   }
 
   return (
-    <div style={{ background: "#050505", color: "#fff", fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
+    <div style={{ background: "#0c0b0a", color: "#f7f3ee", fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
 
       {/* ─── HERO ─── */}
       <div style={{ position: "relative", minHeight: "100vh", overflow: "hidden" }}>
 
         {/* Background: food photo + 3D radar rings */}
-        <PhotoHero query={query} category={category} hasResults={results.length > 0} isSearching={loading} />
+        <PhotoHero query={query} category={category} />
         <FloatingPhotos query={query} category={category} visible={searched && results.length > 0} />
 
         {/* Nav + hero content */}
@@ -370,39 +386,37 @@ export default function App() {
           {/* NAV */}
           <nav style={{
             display: "flex", justifyContent: "space-between", alignItems: "center",
-            padding: "28px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
+            padding: "28px 0", borderBottom: "1px solid rgba(247,243,238,0.09)", flexShrink: 0,
           }}>
             <button
               onClick={() => setView("landing")}
               aria-label="Back to RecallRadar landing page"
               style={{ width: "210px", height: "86px", border: 0, padding: 0, background: "transparent", cursor: "pointer", flexShrink: 0 }}
             >
-              <RecallRadarLogo className="app-nav-logo" />
+              <RecallRadarLogo className="app-nav-logo" idPrefix="nav" />
             </button>
 
-            {/* Nav links */}
-            <div style={{ display: "flex", gap: "36px", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.1em" }}>
-              {(["SCAN", "SEARCH", "TRACK", "ALERTS", "INSIGHTS"] as const).map((item) => (
-                <span key={item} style={{ cursor: "pointer", color: "rgba(255,255,255,0.72)" }}>{item}</span>
-              ))}
-            </div>
-
-            {/* Bell + avatar */}
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-              <div style={{ position: "relative", cursor: "pointer", padding: "6px" }}>
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M10 2.5C10 2.5 5 5.5 5 10V14.5L3 16H17L15 14.5V10C15 5.5 10 2.5 10 2.5Z" stroke="rgba(255,255,255,0.65)" strokeWidth="1.4" strokeLinejoin="round" />
-                  <path d="M8.5 16C8.5 16.83 9.17 17.5 10 17.5C10.83 17.5 11.5 16.83 11.5 16" stroke="rgba(255,255,255,0.65)" strokeWidth="1.4" />
-                </svg>
-                <div style={{ position: "absolute", top: "1px", right: "1px", background: "#ff3b30", borderRadius: "999px", width: "16px", height: "16px", fontSize: "9px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#fff", border: "2px solid #050505" }}>2</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
-                <div style={{ width: "34px", height: "34px", borderRadius: "999px", background: "#252525", border: "1px solid rgba(255,255,255,0.14)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.76rem", fontWeight: 900 }}>RM</div>
-                <svg width="11" height="7" viewBox="0 0 11 7" fill="none">
-                  <path d="M1 1L5.5 6L10 1" stroke="rgba(255,255,255,0.38)" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </div>
-            </div>
+            <button
+              onClick={() => setShowHistory(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: "8px",
+                background: "rgba(247,243,238,0.06)", border: "1px solid rgba(247,243,238,0.1)",
+                color: "rgba(247,243,238,0.78)", borderRadius: "999px", padding: "9px 16px",
+                cursor: "pointer", fontWeight: 700, fontSize: "0.78rem", letterSpacing: "0.04em",
+                fontFamily: "inherit",
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+                <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M10 6V10L12.6 11.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+              History
+              {(savedSearches.length + searchHistory.length) > 0 && (
+                <span style={{ background: "#c65b45", color: "#fbf1ec", borderRadius: "999px", padding: "1px 7px", fontSize: "0.68rem", fontWeight: 900 }}>
+                  {savedSearches.length + searchHistory.length}
+                </span>
+              )}
+            </button>
           </nav>
 
           {/* Hero text + search */}
@@ -412,7 +426,7 @@ export default function App() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              style={{ color: "#ff3b30", letterSpacing: "0.22em", fontSize: "0.7rem", fontWeight: 900, marginBottom: "28px" }}
+              style={{ color: "#c65b45", letterSpacing: "0.22em", fontSize: "0.7rem", fontWeight: 900, marginBottom: "28px" }}
             >
               KNOW BEFORE IT HURTS YOU
             </motion.p>
@@ -428,7 +442,7 @@ export default function App() {
                 letterSpacing: "-0.04em",
                 fontWeight: 400,
                 marginBottom: "28px",
-                color: "#fff",
+                color: "#f7f3ee",
               }}
             >
               Real-time recall<br />intelligence.<br />For everything<br />you bring home.
@@ -438,7 +452,7 @@ export default function App() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.16 }}
-              style={{ color: "rgba(255,255,255,0.5)", maxWidth: "380px", fontSize: "0.94rem", lineHeight: 1.72, marginBottom: "44px" }}
+              style={{ color: "rgba(247,243,238,0.55)", maxWidth: "380px", fontSize: "0.94rem", lineHeight: 1.72, marginBottom: "44px" }}
             >
               Scan a barcode or search a product to see if it's been recalled and why.
             </motion.p>
@@ -452,8 +466,8 @@ export default function App() {
             >
               <div style={{
                 display: "flex",
-                background: "rgba(12,12,12,0.92)",
-                border: "1px solid rgba(255,255,255,0.1)",
+                background: "rgba(12,11,10,0.92)",
+                border: "1px solid rgba(247,243,238,0.1)",
                 borderRadius: "14px",
                 overflow: "hidden",
                 backdropFilter: "blur(24px)",
@@ -463,13 +477,13 @@ export default function App() {
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && searchRecalls()}
                   placeholder="Search by product, brand, or barcode..."
-                  style={{ flex: 1, padding: "18px 16px", background: "transparent", border: "none", color: "#fff", outline: "none", fontSize: "0.94rem", fontFamily: "inherit" }}
+                  style={{ flex: 1, padding: "18px 16px", background: "transparent", border: "none", color: "#f7f3ee", outline: "none", fontSize: "0.94rem", fontFamily: "inherit" }}
                 />
-                <span style={{ display: "flex", alignItems: "center", paddingRight: "12px", color: "rgba(255,255,255,0.18)", fontSize: "0.75rem", letterSpacing: "0.06em", flexShrink: 0, pointerEvents: "none" }}>⌘K</span>
+                <span style={{ display: "flex", alignItems: "center", paddingRight: "12px", color: "rgba(247,243,238,0.18)", fontSize: "0.75rem", letterSpacing: "0.06em", flexShrink: 0, pointerEvents: "none" }}>⌘K</span>
                 <button
                   type="button"
                   onClick={() => searchRecalls()}
-                  style={{ background: "#ff3b30", border: "none", color: "#fff", padding: "0 18px", cursor: "pointer", fontWeight: 900, fontFamily: "inherit", flexShrink: 0 }}
+                  style={{ background: "#c65b45", border: "none", color: "#fbf1ec", padding: "0 18px", cursor: "pointer", fontWeight: 900, fontFamily: "inherit", flexShrink: 0 }}
                 >
                   Search
                 </button>
@@ -477,37 +491,37 @@ export default function App() {
                   type="button"
                   onClick={() => setShowScanner(true)}
                   title="Scan barcode"
-                  style={{ background: "#ff3b30", border: "none", color: "#fff", padding: "0 20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                  style={{ background: "#c65b45", border: "none", color: "#fbf1ec", padding: "0 20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
                 >
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <rect x="1" y="4" width="2" height="12" fill="white" rx="0.5" />
-                    <rect x="4.5" y="4" width="1" height="12" fill="white" rx="0.5" />
-                    <rect x="7" y="4" width="2" height="12" fill="white" rx="0.5" />
-                    <rect x="10.5" y="4" width="1" height="12" fill="white" rx="0.5" />
-                    <rect x="13" y="4" width="3" height="12" fill="white" rx="0.5" />
-                    <rect x="17.5" y="4" width="1.5" height="12" fill="white" rx="0.5" />
+                    <rect x="1" y="4" width="2" height="12" fill="currentColor" rx="0.5" />
+                    <rect x="4.5" y="4" width="1" height="12" fill="currentColor" rx="0.5" />
+                    <rect x="7" y="4" width="2" height="12" fill="currentColor" rx="0.5" />
+                    <rect x="10.5" y="4" width="1" height="12" fill="currentColor" rx="0.5" />
+                    <rect x="13" y="4" width="3" height="12" fill="currentColor" rx="0.5" />
+                    <rect x="17.5" y="4" width="1.5" height="12" fill="currentColor" rx="0.5" />
                   </svg>
                 </button>
               </div>
 
-              <div style={{ marginTop: "14px", display: "flex", alignItems: "center", gap: "10px", color: "rgba(255,255,255,0.36)", fontSize: "0.84rem" }}>
+              <div style={{ marginTop: "14px", display: "flex", alignItems: "center", gap: "10px", color: "rgba(247,243,238,0.36)", fontSize: "0.84rem" }}>
                 <span>or</span>
                 <button
                   type="button"
                   onClick={() => setShowScanner(true)}
-                  style={{ background: "none", border: "none", color: "rgba(255,255,255,0.44)", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.84rem", padding: 0, fontFamily: "inherit" }}
+                  style={{ background: "none", border: "none", color: "rgba(247,243,238,0.44)", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.84rem", padding: 0, fontFamily: "inherit" }}
                 >
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                    <circle cx="7.5" cy="7.5" r="6.5" stroke="rgba(255,255,255,0.44)" strokeWidth="1" />
-                    <circle cx="7.5" cy="7.5" r="2.5" stroke="rgba(255,255,255,0.44)" strokeWidth="1" />
-                    <circle cx="7.5" cy="7.5" r="1" fill="rgba(255,255,255,0.44)" />
+                    <circle cx="7.5" cy="7.5" r="6.5" stroke="rgba(247,243,238,0.44)" strokeWidth="1" />
+                    <circle cx="7.5" cy="7.5" r="2.5" stroke="rgba(247,243,238,0.44)" strokeWidth="1" />
+                    <circle cx="7.5" cy="7.5" r="1" fill="rgba(247,243,238,0.44)" />
                   </svg>
                   Scan barcode
                 </button>
               </div>
 
               {loading && (
-                <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "0.82rem", marginTop: "12px" }}>
+                <p style={{ color: "rgba(247,243,238,0.35)", fontSize: "0.82rem", marginTop: "12px" }}>
                   Searching {sourceName(category)} recall data...
                 </p>
               )}
@@ -521,9 +535,9 @@ export default function App() {
                     style={{
                       padding: "7px 14px",
                       borderRadius: "999px",
-                      border: category === c ? "1px solid rgba(255,255,255,0.4)" : "1px solid rgba(255,255,255,0.1)",
-                      background: category === c ? "rgba(255,255,255,0.09)" : "transparent",
-                      color: category === c ? "#fff" : "rgba(255,255,255,0.36)",
+                      border: category === c ? "1px solid rgba(247,243,238,0.4)" : "1px solid rgba(247,243,238,0.1)",
+                      background: category === c ? "rgba(247,243,238,0.09)" : "transparent",
+                      color: category === c ? "#f7f3ee" : "rgba(247,243,238,0.36)",
                       cursor: "pointer",
                       fontWeight: 700,
                       fontSize: "0.74rem",
@@ -544,20 +558,20 @@ export default function App() {
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "0 28px" }}>
 
         {error && (
-          <p style={{ color: "#ff8a80", margin: "28px 0 0", textAlign: "center" }}>{error}</p>
+          <p style={{ color: "#ff6b60", margin: "28px 0 0", textAlign: "center" }}>{error}</p>
         )}
 
         {copied && (
-          <p style={{ color: "#a7f3d0", margin: "28px 0 0", textAlign: "center", fontWeight: 800 }}>Link copied to clipboard.</p>
+          <p style={{ color: "#8fb08f", margin: "28px 0 0", textAlign: "center", fontWeight: 800 }}>Link copied to clipboard.</p>
         )}
 
         {!loading && searched && results.length === 0 && (
-          <section style={{ marginTop: "40px", padding: "28px", borderRadius: "20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(10px)" }}>
-            <p style={{ color: "#ffb4ae", fontSize: "12px", marginBottom: "10px", fontWeight: 900 }}>BROADER SAFETY SIGNALS</p>
+          <section style={{ marginTop: "40px", padding: "28px", borderRadius: "20px", background: "rgba(247,243,238,0.03)", border: "1px solid rgba(247,243,238,0.07)", backdropFilter: "blur(10px)" }}>
+            <p style={{ color: "#e4a396", fontSize: "12px", marginBottom: "10px", fontWeight: 900 }}>BROADER SAFETY SIGNALS</p>
             <h3 style={{ marginBottom: "10px" }}>
               {category === "vehicle" ? "No NHTSA match found" : category === "consumer" ? "No CPSC match found" : "No FDA match - expanding your search"}
             </h3>
-            <p style={{ color: "#aaa", lineHeight: 1.6 }}>
+            <p style={{ color: "rgba(247,243,238,0.55)", lineHeight: 1.6 }}>
               {category === "vehicle"
                 ? "Try a full year, make, and model. VIN-specific checks should still be confirmed with NHTSA or the manufacturer."
                 : category === "consumer"
@@ -588,7 +602,6 @@ export default function App() {
             const severity = getSeverity(r.reason_for_recall, resultCategory);
             const guidance = getGuidance(r.reason_for_recall, resultCategory);
             const cardId = `${r.report_date}-${r.recalling_firm}-${i}`;
-            const isExpanded = expandedWhy === cardId;
             const imageQuery = isVehicle
               ? `${r.classification || ""} ${r.reason_for_recall || ""} ${r.product_description || query}`
               : r.product_description || query;
@@ -602,10 +615,11 @@ export default function App() {
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.045 }}
-                whileHover={{ scale: 1.008, boxShadow: "0 24px 80px rgba(255,59,48,0.1)" }}
+                whileHover={{ scale: 1.008, boxShadow: "0 24px 80px rgba(198,91,69,0.1)" }}
+                onViewportEnter={() => logAlert(r, resultCategory)}
                 style={{
-                  background: "linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02))",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "linear-gradient(135deg, rgba(247,243,238,0.055), rgba(247,243,238,0.02))",
+                  border: "1px solid rgba(247,243,238,0.08)",
                   padding: "24px",
                   marginBottom: "16px",
                   borderRadius: "20px",
@@ -613,11 +627,11 @@ export default function App() {
                   overflow: "hidden",
                 }}
               >
-                <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at top right, rgba(255,59,48,0.14), transparent 32%)", pointerEvents: "none" }} />
+                <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at top right, rgba(198,91,69,0.14), transparent 32%)", pointerEvents: "none" }} />
                 <div style={{ position: "relative" }}>
 
                   {/* Product image */}
-                  <div style={{ position: "relative", width: "100%", height: "210px", borderRadius: "20px", overflow: "hidden", marginBottom: "20px", background: "#111", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <div style={{ position: "relative", width: "100%", height: "210px", borderRadius: "20px", overflow: "hidden", marginBottom: "20px", background: "#111", border: "1px solid rgba(247,243,238,0.07)" }}>
                     <img
                       src={getProductImage(imageQuery, i, resultCategory)}
                       alt={r.product_description || "Product"}
@@ -626,16 +640,16 @@ export default function App() {
                     <div style={{ position: "absolute", inset: 0, background: isVehicle ? "linear-gradient(90deg, rgba(0,0,0,0.78), rgba(0,0,0,0.22)), linear-gradient(to top, rgba(0,0,0,0.68), rgba(0,0,0,0.04))" : "linear-gradient(to top, rgba(0,0,0,0.48), rgba(0,0,0,0.02))" }} />
                     {!isVehicle && (
                       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                        <div style={{ width: "120px", height: "120px", borderRadius: "999px", border: "1px solid rgba(255,255,255,0.18)", boxShadow: "0 0 24px rgba(255,255,255,0.16)", animation: "pulse 3s infinite" }} />
+                        <div style={{ width: "120px", height: "120px", borderRadius: "999px", border: "1px solid rgba(247,243,238,0.18)", boxShadow: "0 0 24px rgba(247,243,238,0.16)", animation: "pulse 3s infinite" }} />
                       </div>
                     )}
-                    <div style={{ position: "absolute", top: "14px", left: "14px", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.08)", padding: "9px 12px", borderRadius: "14px", color: "#fff", fontWeight: 800, fontSize: "0.74rem", letterSpacing: "0.04em" }}>
+                    <div style={{ position: "absolute", top: "14px", left: "14px", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(12px)", border: "1px solid rgba(247,243,238,0.08)", padding: "9px 12px", borderRadius: "14px", color: "#f7f3ee", fontWeight: 800, fontSize: "0.74rem", letterSpacing: "0.04em" }}>
                       {isVehicle ? "NHTSA MATCH" : "SCAN DETECTED"}
                     </div>
                     {isVehicle && (
                       <div style={{ position: "absolute", left: "18px", right: "18px", bottom: "16px", display: "grid", gap: "12px" }}>
                         <div>
-                          <p style={{ margin: "0 0 8px", color: "#30d158", fontSize: "0.74rem", fontWeight: 900, letterSpacing: "0.12em" }}>VEHICLE RECALL DOSSIER</p>
+                          <p style={{ margin: "0 0 8px", color: "#8fb08f", fontSize: "0.74rem", fontWeight: 900, letterSpacing: "0.12em" }}>VEHICLE RECALL DOSSIER</p>
                           <h4 style={{ margin: 0, fontSize: "1.55rem", lineHeight: 1.1 }}>{shortText(r.product_description || query, 90)}</h4>
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "10px" }}>
@@ -644,9 +658,9 @@ export default function App() {
                             ["Campaign", r.recall_number || "NHTSA"],
                             ["Next step", "Confirm by VIN"],
                           ].map(([label, value]) => (
-                            <div key={label} style={{ padding: "10px 12px", borderRadius: "14px", background: "rgba(0,0,0,0.48)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                              <div style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.68rem", fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</div>
-                              <div style={{ marginTop: "4px", color: "#fff", fontWeight: 850, fontSize: "0.86rem" }}>{shortText(value, 34)}</div>
+                            <div key={label} style={{ padding: "10px 12px", borderRadius: "14px", background: "rgba(0,0,0,0.48)", border: "1px solid rgba(247,243,238,0.1)" }}>
+                              <div style={{ color: "rgba(247,243,238,0.45)", fontSize: "0.68rem", fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</div>
+                              <div style={{ marginTop: "4px", color: "#f7f3ee", fontWeight: 850, fontSize: "0.86rem" }}>{shortText(value, 34)}</div>
                             </div>
                           ))}
                         </div>
@@ -657,8 +671,8 @@ export default function App() {
                   {/* Severity badge */}
                   <div style={{
                     display: "inline-flex",
-                    background: severity === "HIGH" ? "rgba(255,59,48,0.22)" : severity === "MEDIUM" ? "rgba(255,149,0,0.22)" : "rgba(255,255,255,0.08)",
-                    color: severity === "HIGH" ? "#ff3b30" : severity === "MEDIUM" ? "#ff9500" : "#aaa",
+                    background: severity === "HIGH" ? "rgba(255,59,48,0.22)" : severity === "MEDIUM" ? "rgba(217,164,65,0.22)" : "rgba(247,243,238,0.08)",
+                    color: severity === "HIGH" ? "#ff3b30" : severity === "MEDIUM" ? "#d9a441" : "rgba(247,243,238,0.55)",
                     padding: "6px 11px", borderRadius: "999px", fontSize: "12px", fontWeight: 900, marginBottom: "12px",
                   }}>
                     ⚠️ {riskLabel}
@@ -668,11 +682,11 @@ export default function App() {
                     {highlight(shortText(r.product_description || "Unknown product", 180), query)}
                   </h3>
 
-                  <p style={{ color: "#bbb", lineHeight: 1.55, marginBottom: "4px" }}>
-                    <strong style={{ color: "#fff" }}>Reason:</strong>{" "}
+                  <p style={{ color: "rgba(247,243,238,0.6)", lineHeight: 1.55, marginBottom: "4px" }}>
+                    <strong style={{ color: "#f7f3ee" }}>Reason:</strong>{" "}
                     {highlight(shortText(r.reason_for_recall || "No data", 180), query)}
                   </p>
-                  <p style={{ color: "#999", fontSize: "0.92rem" }}>{guidance.label}</p>
+                  <p style={{ color: "rgba(247,243,238,0.45)", fontSize: "0.92rem" }}>{guidance.label}</p>
 
                   <RiskIntelligence
                     risk={{
@@ -703,63 +717,17 @@ export default function App() {
                     } : undefined}
                   />
 
-                  {/* What to do */}
-                  <div style={{ marginTop: "18px", padding: "18px", borderRadius: "18px", background: "rgba(0,0,0,0.28)", border: "1px solid rgba(255,255,255,0.07)", textAlign: "left" }}>
-                    <strong style={{ display: "block", marginBottom: "12px" }}>🧭 What should I do?</strong>
-                    <div style={{ display: "grid", gap: "10px" }}>
-                      {guidance.actions.map((action, index) => (
-                        <motion.div
-                          key={action}
-                          initial={{ opacity: 0, x: -8 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          style={{ padding: "10px 12px", borderRadius: "12px", background: "rgba(255,255,255,0.04)", color: "#ddd", border: "1px solid rgba(255,255,255,0.05)" }}
-                        >
-                          {action}
-                        </motion.div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => setExpandedWhy(isExpanded ? null : cardId)}
-                      style={{ marginTop: "14px", padding: "10px 12px", borderRadius: "12px", background: "transparent", border: "1px solid rgba(255,255,255,0.13)", color: "#ddd", cursor: "pointer", fontWeight: 800, fontFamily: "inherit" }}
-                    >
-                      {isExpanded ? "Hide explanation" : isVehicle ? "Why confirm by VIN?" : "Why is this dangerous?"}
-                    </button>
-                    <AnimatePresence>
-                      {isExpanded && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden" }}>
-                          <p style={{ color: "#aaa", lineHeight: 1.6, marginTop: "12px" }}>
-                            This guidance is based on the recall reason:{" "}
-                            <strong style={{ color: "#fff" }}>{r.reason_for_recall || "No reason provided."}</strong>
-                          </p>
-                          <p style={{ color: "#888", lineHeight: 1.6, marginTop: "8px" }}>
-                            {isVehicle
-                              ? "A year/make/model search can find matching safety campaigns, but VIN lookup confirms whether your exact vehicle is included and whether the repair is open."
-                              : "For return or refund details, check the store where you purchased it or contact the recalling company."}
-                          </p>
-                          <a
-                            href={isVehicle ? officialRecallUrl : `https://www.google.com/search?q=${encodeURIComponent(`${r.recalling_firm || ""} recall contact return refund`)}`}
-                            target="_blank" rel="noreferrer"
-                            style={{ color: "#ffb4ae", fontWeight: 800 }}
-                          >
-                            {isVehicle ? "Open NHTSA recall lookup →" : "Find return/contact info →"}
-                          </a>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  <p style={{ color: "#888", marginTop: "16px", marginBottom: "4px" }}>
-                    <strong style={{ color: "#ccc" }}>Company:</strong> {r.recalling_firm || "Unknown"}
+                  <p style={{ color: "rgba(247,243,238,0.45)", marginTop: "18px", marginBottom: "4px" }}>
+                    <strong style={{ color: "rgba(247,243,238,0.7)" }}>Company:</strong> {r.recalling_firm || "Unknown"}
                   </p>
-                  <p style={{ color: "#666", marginTop: 0 }}>
+                  <p style={{ color: "rgba(247,243,238,0.32)", marginTop: 0 }}>
                     <strong>Date:</strong> {formatDate(r.report_date)}
                   </p>
 
                   <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "16px" }}>
                     <button
                       onClick={() => openPremiumModal(r.product_description)}
-                      style={{ padding: "13px 17px", borderRadius: "13px", background: "#ff3b30", border: "none", color: "#fff", fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}
+                      style={{ padding: "13px 17px", borderRadius: "13px", background: "#c65b45", border: "none", color: "#fbf1ec", fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}
                     >
                       🛡 {isVehicle ? "Save vehicle alerts" : "Protect me from this in the future"}
                     </button>
@@ -768,14 +736,14 @@ export default function App() {
                         href={officialRecallUrl}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ padding: "13px 17px", borderRadius: "13px", background: "rgba(48,209,88,0.14)", border: "1px solid rgba(48,209,88,0.28)", color: "#b8ffd0", fontWeight: 900, textDecoration: "none" }}
+                        style={{ padding: "13px 17px", borderRadius: "13px", background: "rgba(92,138,92,0.14)", border: "1px solid rgba(92,138,92,0.28)", color: "#9bc39b", fontWeight: 900, textDecoration: "none" }}
                       >
                         Check VIN on NHTSA
                       </a>
                     )}
                     <button
                       onClick={() => shareRecall(r)}
-                      style={{ padding: "13px 17px", borderRadius: "13px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.11)", color: "#ddd", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}
+                      style={{ padding: "13px 17px", borderRadius: "13px", background: "rgba(247,243,238,0.06)", border: "1px solid rgba(247,243,238,0.11)", color: "rgba(247,243,238,0.85)", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}
                     >
                       🔗 Share this recall
                     </button>
@@ -786,7 +754,7 @@ export default function App() {
           })}
         </section>
 
-        <footer style={{ color: "#444", textAlign: "center", margin: "60px 0 28px", fontSize: "0.82rem", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "28px" }}>
+        <footer style={{ color: "rgba(247,243,238,0.24)", textAlign: "center", margin: "60px 0 28px", fontSize: "0.82rem", borderTop: "1px solid rgba(247,243,238,0.06)", paddingTop: "28px" }}>
           RecallRadar is not affiliated with FDA, CPSC, or NHTSA. Official data is provided as-is.
         </footer>
       </div>
@@ -804,33 +772,33 @@ export default function App() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 18 }}
               onClick={(e) => e.stopPropagation()}
-              style={{ width: "100%", maxWidth: "520px", background: "linear-gradient(135deg, rgba(22,22,22,0.99), rgba(10,10,10,0.99))", border: "1px solid rgba(255,255,255,0.11)", borderRadius: "24px", padding: "28px", boxShadow: "0 40px 120px rgba(0,0,0,0.7)" }}
+              style={{ width: "100%", maxWidth: "520px", background: "linear-gradient(135deg, rgba(18,16,15,0.99), rgba(9,8,7,0.99))", border: "1px solid rgba(247,243,238,0.11)", borderRadius: "24px", padding: "28px", boxShadow: "0 40px 120px rgba(0,0,0,0.7)" }}
             >
               {!joined ? (
                 <>
-                  <p style={{ color: "#ff8a80", fontWeight: 900, letterSpacing: "0.08em", fontSize: "0.76rem", margin: 0 }}>PREMIUM MONITORING</p>
-                  <h2 style={{ margin: "12px 0", fontSize: "2rem", color: "#fff" }}>Never miss a dangerous recall.</h2>
-                  <p style={{ color: "#aaa", lineHeight: 1.6 }}>Join early access and we'll notify you when monitoring opens for products like:</p>
-                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "14px", color: "#fff", margin: "16px 0" }}>
+                  <p style={{ color: "#e4a396", fontWeight: 900, letterSpacing: "0.08em", fontSize: "0.76rem", margin: 0 }}>PREMIUM MONITORING</p>
+                  <h2 style={{ margin: "12px 0", fontSize: "2rem", color: "#f7f3ee" }}>Never miss a dangerous recall.</h2>
+                  <p style={{ color: "rgba(247,243,238,0.55)", lineHeight: 1.6 }}>Join early access and we'll notify you when monitoring opens for products like:</p>
+                  <div style={{ background: "rgba(247,243,238,0.06)", border: "1px solid rgba(247,243,238,0.08)", borderRadius: "16px", padding: "14px", color: "#f7f3ee", margin: "16px 0" }}>
                     {shortText(selectedProduct, 100)}
                   </div>
                   <input
                     value={email} onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email" type="email"
-                    style={{ width: "100%", boxSizing: "border-box", padding: "15px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.11)", background: "#070707", color: "#fff", outline: "none", fontSize: "1rem", fontFamily: "inherit" }}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "15px", borderRadius: "14px", border: "1px solid rgba(247,243,238,0.11)", background: "#070707", color: "#f7f3ee", outline: "none", fontSize: "1rem", fontFamily: "inherit" }}
                   />
-                  <button onClick={joinWaitlist} style={{ width: "100%", marginTop: "12px", padding: "15px", borderRadius: "14px", background: "#ff3b30", color: "#fff", border: "none", fontWeight: 900, cursor: "pointer", fontSize: "1rem", fontFamily: "inherit" }}>
+                  <button onClick={joinWaitlist} style={{ width: "100%", marginTop: "12px", padding: "15px", borderRadius: "14px", background: "#c65b45", color: "#fbf1ec", border: "none", fontWeight: 900, cursor: "pointer", fontSize: "1rem", fontFamily: "inherit" }}>
                     Join early access
                   </button>
-                  <button onClick={closePremiumModal} style={{ width: "100%", marginTop: "10px", padding: "12px", borderRadius: "14px", background: "transparent", color: "#777", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                  <button onClick={closePremiumModal} style={{ width: "100%", marginTop: "10px", padding: "12px", borderRadius: "14px", background: "transparent", color: "rgba(247,243,238,0.4)", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
                     Maybe later
                   </button>
                 </>
               ) : (
                 <>
-                  <h2 style={{ margin: "0 0 12px", fontSize: "2rem", color: "#fff" }}>You're on the list.</h2>
-                  <p style={{ color: "#aaa", lineHeight: 1.6 }}>Your email has been saved. We'll notify you when premium monitoring opens.</p>
-                  <button onClick={closePremiumModal} style={{ width: "100%", marginTop: "12px", padding: "15px", borderRadius: "14px", background: "#fff", color: "#000", border: "none", fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>
+                  <h2 style={{ margin: "0 0 12px", fontSize: "2rem", color: "#f7f3ee" }}>You're on the list.</h2>
+                  <p style={{ color: "rgba(247,243,238,0.55)", lineHeight: 1.6 }}>Your email has been saved. We'll notify you when premium monitoring opens.</p>
+                  <button onClick={closePremiumModal} style={{ width: "100%", marginTop: "12px", padding: "15px", borderRadius: "14px", background: "#f7f3ee", color: "#0c0b0a", border: "none", fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>
                     Continue exploring
                   </button>
                 </>
@@ -851,6 +819,25 @@ export default function App() {
           }}
         />
       )}
+
+      {/* ─── HISTORY DRAWER ─── */}
+      <AnimatePresence>
+        {showHistory && (
+          <HistoryPanel
+            open={showHistory}
+            onClose={() => setShowHistory(false)}
+            searchHistory={searchHistory}
+            savedSearches={savedSearches}
+            alertHistory={alertHistory}
+            onRunSearch={handleRunSearch}
+            onToggleSaved={toggleSaved}
+            isSaved={isSaved}
+            onClearHistory={clearHistory}
+            onClearSaved={clearSaved}
+          />
+        )}
+      </AnimatePresence>
+
       <style>{`
         .app-nav-logo {
           display: block;

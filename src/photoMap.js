@@ -166,11 +166,11 @@ const categoryFallbackSets = {
 
 // ─── Category ambient glow colours ───────────────────────────────────────────
 export const categoryGlow = {
-  food: { primary: "#ff6040", secondary: "#ffb090", bg: "radial-gradient(ellipse at top center, rgba(255,96,64,0.12) 0%, transparent 60%)" },
-  drug: { primary: "#4488ff", secondary: "#80bbff", bg: "radial-gradient(ellipse at top center, rgba(68,136,255,0.1) 0%, transparent 60%)" },
-  device: { primary: "#0a84ff", secondary: "#60ccff", bg: "radial-gradient(ellipse at top center, rgba(10,132,255,0.1) 0%, transparent 60%)" },
-  consumer: { primary: "#bf5af2", secondary: "#d890ff", bg: "radial-gradient(ellipse at top center, rgba(191,90,242,0.1) 0%, transparent 60%)" },
-  vehicle: { primary: "#30d158", secondary: "#80e8a0", bg: "radial-gradient(ellipse at top center, rgba(48,209,88,0.08) 0%, transparent 60%)" },
+  food: { primary: "#c65b45", secondary: "#d97a62", bg: "radial-gradient(ellipse at top center, rgba(198,91,69,0.12) 0%, transparent 60%)" },
+  drug: { primary: "#5c8a5c", secondary: "#8fb08f", bg: "radial-gradient(ellipse at top center, rgba(92,138,92,0.1) 0%, transparent 60%)" },
+  device: { primary: "#8a7a9e", secondary: "#b3a5c4", bg: "radial-gradient(ellipse at top center, rgba(138,122,158,0.1) 0%, transparent 60%)" },
+  consumer: { primary: "#d9a441", secondary: "#e8c179", bg: "radial-gradient(ellipse at top center, rgba(217,164,65,0.1) 0%, transparent 60%)" },
+  vehicle: { primary: "#7a8a94", secondary: "#a8b8c0", bg: "radial-gradient(ellipse at top center, rgba(122,138,148,0.08) 0%, transparent 60%)" },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

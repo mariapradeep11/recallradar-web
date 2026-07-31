@@ -5,23 +5,7 @@ import { resolveAllPhotos, preloadPhoto, categoryGlow } from "./photoMap.js";
 
 const DEFAULT_PHOTO = "/images/chicken/chicken-01.jpg";
 
-const sourceLabels = {
-  food: "FDA Database Match",
-  drug: "FDA Database Match",
-  device: "FDA Database Match",
-  consumer: "CPSC Database Match",
-  vehicle: "NHTSA Database Match",
-};
-
-const detectionLabels = {
-  food: "Product Detected",
-  drug: "Product Detected",
-  device: "Device Detected",
-  consumer: "Product Detected",
-  vehicle: "Vehicle Detected",
-};
-
-function TargetOrbit({ color = "#ff3b30" }) {
+function TargetOrbit({ color = "#c65b45" }) {
   const outerRingRef = useRef();
   const dotRef = useRef();
 
@@ -41,13 +25,13 @@ function TargetOrbit({ color = "#ff3b30" }) {
       <group ref={outerRingRef}>
         <mesh>
           <ringGeometry args={[1.70, 1.74, 128]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.42} side={2} />
+          <meshBasicMaterial color="#f7f3ee" transparent opacity={0.42} side={2} />
         </mesh>
         {/* 4 tick marks on outer ring */}
         {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((a, i) => (
           <mesh key={i} position={[Math.cos(a) * 1.72, Math.sin(a) * 1.72, 0]}>
             <circleGeometry args={[0.042, 8]} />
-            <meshBasicMaterial color="#ffffff" transparent opacity={0.55} side={2} />
+            <meshBasicMaterial color="#f7f3ee" transparent opacity={0.55} side={2} />
           </mesh>
         ))}
       </group>
@@ -55,34 +39,34 @@ function TargetOrbit({ color = "#ff3b30" }) {
       {/* Middle ring — static */}
       <mesh>
         <ringGeometry args={[1.15, 1.18, 128]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.22} side={2} />
+        <meshBasicMaterial color="#f7f3ee" transparent opacity={0.22} side={2} />
       </mesh>
 
       {/* Inner ring — static */}
       <mesh>
         <ringGeometry args={[0.58, 0.60, 64]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.15} side={2} />
+        <meshBasicMaterial color="#f7f3ee" transparent opacity={0.15} side={2} />
       </mesh>
 
       {/* Crosshair lines — 4 directions */}
       <mesh position={[0, 1.1, 0]}>
         <planeGeometry args={[0.007, 0.52]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.22} side={2} />
+        <meshBasicMaterial color="#f7f3ee" transparent opacity={0.22} side={2} />
       </mesh>
       <mesh position={[0, -1.1, 0]}>
         <planeGeometry args={[0.007, 0.52]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.22} side={2} />
+        <meshBasicMaterial color="#f7f3ee" transparent opacity={0.22} side={2} />
       </mesh>
       <mesh position={[1.1, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
         <planeGeometry args={[0.007, 0.52]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.22} side={2} />
+        <meshBasicMaterial color="#f7f3ee" transparent opacity={0.22} side={2} />
       </mesh>
       <mesh position={[-1.1, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
         <planeGeometry args={[0.007, 0.52]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.22} side={2} />
+        <meshBasicMaterial color="#f7f3ee" transparent opacity={0.22} side={2} />
       </mesh>
 
-      {/* Orbiting red dot + glow halo */}
+      {/* Orbiting dot + glow halo */}
       <group ref={dotRef}>
         <mesh>
           <circleGeometry args={[0.1, 32]} />
@@ -94,7 +78,7 @@ function TargetOrbit({ color = "#ff3b30" }) {
         </mesh>
       </group>
 
-      {/* Center red dot */}
+      {/* Center dot */}
       <mesh>
         <circleGeometry args={[0.055, 32]} />
         <meshBasicMaterial color={color} transparent opacity={0.8} side={2} />
@@ -178,67 +162,25 @@ export default function PhotoHero({
       {/* Left-to-right dark fade — lets text stay readable */}
       <div style={{
         position: "absolute", inset: 0, zIndex: 2,
-        background: "linear-gradient(90deg, rgba(5,5,5,0.97) 0%, rgba(5,5,5,0.88) 28%, rgba(5,5,5,0.62) 50%, rgba(5,5,5,0.2) 70%, rgba(5,5,5,0.05) 100%)",
+        background: "linear-gradient(90deg, rgba(12,11,10,0.97) 0%, rgba(12,11,10,0.88) 28%, rgba(12,11,10,0.62) 50%, rgba(12,11,10,0.2) 70%, rgba(12,11,10,0.05) 100%)",
       }} />
 
       {/* Bottom fade */}
       <div style={{
         position: "absolute", inset: 0, zIndex: 2,
-        background: "linear-gradient(to top, rgba(5,5,5,0.6) 0%, transparent 40%)",
+        background: "linear-gradient(to top, rgba(12,11,10,0.6) 0%, transparent 40%)",
       }} />
 
-      {/* Red glow on the photo side */}
+      {/* Category-tinted glow on the photo side */}
       <div style={{
         position: "absolute", inset: 0, zIndex: 3, mixBlendMode: "screen",
-        background: "radial-gradient(circle at 68% 44%, rgba(255,255,255,0.1), transparent 14%), radial-gradient(circle at 72% 46%, rgba(255,59,48,0.2), transparent 30%)",
+        background: `radial-gradient(circle at 68% 44%, rgba(247,243,238,0.1), transparent 14%), ${glow.bg}`,
       }} />
 
       {/* 3D scan rings — centered on the food photo */}
       <div style={{ position: "absolute", right: "6%", top: "12%", width: "480px", height: "480px", zIndex: 4, opacity: 0.9 }}>
         <OrbitCanvas color={glow.primary} />
       </div>
-
-      {/* Product detection callout — always visible; shows real query or demo */}
-      <div style={{
-        position: "absolute",
-        right: "5%",
-        top: "22%",
-        zIndex: 5,
-        display: "grid",
-        gap: "14px",
-        maxWidth: "220px",
-        color: "rgba(255,255,255,0.65)",
-        fontSize: "0.7rem",
-        letterSpacing: "0.09em",
-        textTransform: "uppercase",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{ width: "6px", height: "6px", borderRadius: "999px", background: glow.primary, flexShrink: 0, boxShadow: `0 0 6px ${glow.primary}` }} />
-          <div>
-            <strong style={{ color: "#fff", fontSize: "0.72rem", display: "block", letterSpacing: "0.1em" }}>{detectionLabels[category] || "Product Detected"}</strong>
-            <span style={{ color: "rgba(255,255,255,0.38)", marginTop: "3px", display: "block" }}>93% Confidence</span>
-          </div>
-        </div>
-        <div style={{ height: "1px", background: "linear-gradient(90deg, rgba(255,255,255,0.25), transparent)" }} />
-        <div>
-          <strong style={{ color: "#fff", fontSize: "0.72rem", display: "block", letterSpacing: "0.1em" }}>
-            {query || "Chicken — Poultry"}
-          </strong>
-          <span style={{ color: glow.primary, marginTop: "3px", display: "block" }}>{sourceLabels[category] || "Official Database Match"}</span>
-        </div>
-      </div>
-
-      {/* Connection lines from callout to orbit center */}
-      <div style={{
-        position: "absolute",
-        right: "calc(5% + 220px)",
-        top: "30%",
-        zIndex: 5,
-        width: "60px",
-        height: "1px",
-        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.2))",
-        pointerEvents: "none",
-      }} />
     </div>
   );
 }

@@ -188,25 +188,25 @@ export default function BarcodeScanner({ onResult, onClose }) {
 
   useEffect(() => () => stopStream(), []);
 
-  const primaryBtn = { width: "100%", padding: "15px", borderRadius: "14px", background: "#ff3b30", color: "#fff", border: "none", fontWeight: 900, cursor: "pointer", fontSize: "1rem" };
-  const whiteBtn   = { width: "100%", padding: "15px", borderRadius: "14px", background: "#fff", color: "#000", border: "none", fontWeight: 900, cursor: "pointer" };
-  const ghostBtn   = { width: "100%", marginTop: "10px", padding: "12px", borderRadius: "14px", background: "transparent", color: "#666", border: "none", cursor: "pointer" };
-  const chipBtn    = { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#ccc", borderRadius: "999px", padding: "8px 14px", cursor: "pointer", fontSize: "0.82rem", fontWeight: 700 };
+  const primaryBtn = { width: "100%", padding: "15px", borderRadius: "14px", background: "#c65b45", color: "#fbf1ec", border: "none", fontWeight: 900, cursor: "pointer", fontSize: "1rem" };
+  const whiteBtn   = { width: "100%", padding: "15px", borderRadius: "14px", background: "#f7f3ee", color: "#0c0b0a", border: "none", fontWeight: 900, cursor: "pointer" };
+  const ghostBtn   = { width: "100%", marginTop: "10px", padding: "12px", borderRadius: "14px", background: "transparent", color: "rgba(247,243,238,0.4)", border: "none", cursor: "pointer" };
+  const chipBtn    = { background: "rgba(247,243,238,0.06)", border: "1px solid rgba(247,243,238,0.1)", color: "rgba(247,243,238,0.75)", borderRadius: "999px", padding: "8px 14px", cursor: "pointer", fontSize: "0.82rem", fontWeight: 700 };
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 200, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "420px", background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "24px", overflow: "hidden" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "420px", background: "#0c0b0a", border: "1px solid rgba(247,243,238,0.1)", borderRadius: "24px", overflow: "hidden" }}>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <span style={{ fontWeight: 800, fontSize: "1rem" }}>📷 Scan a barcode</span>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", borderRadius: "999px", width: "32px", height: "32px", cursor: "pointer", fontSize: "1rem" }}>✕</button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid rgba(247,243,238,0.08)" }}>
+          <span style={{ fontWeight: 800, fontSize: "1rem", color: "#f7f3ee" }}>📷 Scan a barcode</span>
+          <button onClick={onClose} style={{ background: "rgba(247,243,238,0.08)", border: "none", color: "#f7f3ee", borderRadius: "999px", width: "32px", height: "32px", cursor: "pointer", fontSize: "1rem" }}>✕</button>
         </div>
 
         {phase === "idle" && (
           <div style={{ padding: "32px 24px", textAlign: "center" }}>
             <div style={{ fontSize: "3.5rem", marginBottom: "16px" }}>📷</div>
-            <h3 style={{ margin: "0 0 10px" }}>Scan a product barcode</h3>
-            <p style={{ color: "#888", lineHeight: 1.6, marginBottom: "24px", fontSize: "0.9rem" }}>
+            <h3 style={{ margin: "0 0 10px", color: "#f7f3ee" }}>Scan a product barcode</h3>
+            <p style={{ color: "rgba(247,243,238,0.55)", lineHeight: 1.6, marginBottom: "24px", fontSize: "0.9rem" }}>
               Point your camera at any barcode and we'll instantly check for recalls. Camera is only active while this window is open.
             </p>
             <button onClick={() => startCamera(false)} style={primaryBtn}>Enable camera & start scanning</button>
@@ -217,9 +217,9 @@ export default function BarcodeScanner({ onResult, onClose }) {
         {phase === "starting" && (
           <div style={{ padding: "40px 24px", textAlign: "center" }}>
             <div style={{ fontSize: "2.5rem", marginBottom: "16px" }}>⏳</div>
-            <p style={{ color: "#aaa", fontWeight: 700 }}>Starting camera…</p>
-            <p style={{ color: "#666", fontSize: "0.82rem", marginTop: "8px" }}>
-              If prompted, tap <strong style={{ color: "#ccc" }}>Allow</strong> to grant camera access
+            <p style={{ color: "rgba(247,243,238,0.58)", fontWeight: 700 }}>Starting camera…</p>
+            <p style={{ color: "rgba(247,243,238,0.4)", fontSize: "0.82rem", marginTop: "8px" }}>
+              If prompted, tap <strong style={{ color: "rgba(247,243,238,0.75)" }}>Allow</strong> to grant camera access
             </p>
           </div>
         )}
@@ -227,8 +227,8 @@ export default function BarcodeScanner({ onResult, onClose }) {
         {phase === "denied" && (
           <div style={{ padding: "32px 24px", textAlign: "center" }}>
             <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🚫</div>
-            <h3 style={{ margin: "0 0 10px", color: "#ff8a80" }}>Camera access blocked</h3>
-            <p style={{ color: "#888", lineHeight: 1.6, fontSize: "0.9rem", marginBottom: "20px" }}>Enable camera access for this site:</p>
+            <h3 style={{ margin: "0 0 10px", color: "#ff6b60" }}>Camera access blocked</h3>
+            <p style={{ color: "rgba(247,243,238,0.55)", lineHeight: 1.6, fontSize: "0.9rem", marginBottom: "20px" }}>Enable camera access for this site:</p>
             <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
               {[
                 { icon: "🍎", label: "iPhone · Safari",  step: "Settings app → Safari → Camera → Allow" },
@@ -236,9 +236,9 @@ export default function BarcodeScanner({ onResult, onClose }) {
                 { icon: "🤖", label: "Android · Chrome", step: "Tap 🔒 in address bar → Permissions → Camera → Allow" },
                 { icon: "💻", label: "Desktop",          step: "Tap 🔒 in address bar → Camera → Allow" },
               ].map(({ icon, label, step }) => (
-                <div key={label} style={{ padding: "12px 14px", borderRadius: "12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <p style={{ margin: "0 0 3px", color: "#fff", fontSize: "0.85rem", fontWeight: 700 }}>{icon} {label}</p>
-                  <p style={{ margin: 0, color: "#888", fontSize: "0.78rem" }}>{step}</p>
+                <div key={label} style={{ padding: "12px 14px", borderRadius: "12px", background: "rgba(247,243,238,0.04)", border: "1px solid rgba(247,243,238,0.07)" }}>
+                  <p style={{ margin: "0 0 3px", color: "#f7f3ee", fontSize: "0.85rem", fontWeight: 700 }}>{icon} {label}</p>
+                  <p style={{ margin: 0, color: "rgba(247,243,238,0.55)", fontSize: "0.78rem" }}>{step}</p>
                 </div>
               ))}
             </div>
@@ -250,8 +250,8 @@ export default function BarcodeScanner({ onResult, onClose }) {
         {phase === "inuse" && (
           <div style={{ padding: "32px 24px", textAlign: "center" }}>
             <div style={{ fontSize: "3rem", marginBottom: "16px" }}>📹</div>
-            <h3 style={{ margin: "0 0 10px", color: "#ff9500" }}>Camera is in use</h3>
-            <p style={{ color: "#888", lineHeight: 1.6, fontSize: "0.9rem", marginBottom: "24px" }}>
+            <h3 style={{ margin: "0 0 10px", color: "#d9a441" }}>Camera is in use</h3>
+            <p style={{ color: "rgba(247,243,238,0.55)", lineHeight: 1.6, fontSize: "0.9rem", marginBottom: "24px" }}>
               Another app is using your camera. Close it and try again.
             </p>
             <button onClick={() => startCamera(false)} style={whiteBtn}>Try again</button>
@@ -262,12 +262,12 @@ export default function BarcodeScanner({ onResult, onClose }) {
         {phase === "unavailable" && (
           <div style={{ padding: "32px 24px", textAlign: "center" }}>
             <div style={{ fontSize: "3rem", marginBottom: "16px" }}>📵</div>
-            <h3 style={{ margin: "0 0 10px", color: "#ff8a80" }}>Camera not available</h3>
-            <p style={{ color: "#888", lineHeight: 1.6, fontSize: "0.9rem", marginBottom: "12px" }}>
+            <h3 style={{ margin: "0 0 10px", color: "#ff6b60" }}>Camera not available</h3>
+            <p style={{ color: "rgba(247,243,238,0.55)", lineHeight: 1.6, fontSize: "0.9rem", marginBottom: "12px" }}>
               We couldn't access a camera on this device.
             </p>
             {errorDetail && (
-              <p style={{ color: "#444", fontSize: "0.7rem", marginBottom: "20px", fontFamily: "monospace", wordBreak: "break-all" }}>
+              <p style={{ color: "rgba(247,243,238,0.28)", fontSize: "0.7rem", marginBottom: "20px", fontFamily: "monospace", wordBreak: "break-all" }}>
                 {errorDetail}
               </p>
             )}
@@ -311,17 +311,17 @@ export default function BarcodeScanner({ onResult, onClose }) {
                     borderRadius: "8px",
                   }} />
                   {[
-                    { top: "20%", left: "15%", borderTop: "3px solid #ff3b30", borderLeft: "3px solid #ff3b30", borderRadius: "4px 0 0 0" },
-                    { top: "20%", right: "15%", borderTop: "3px solid #ff3b30", borderRight: "3px solid #ff3b30", borderRadius: "0 4px 0 0" },
-                    { bottom: "20%", left: "15%", borderBottom: "3px solid #ff3b30", borderLeft: "3px solid #ff3b30", borderRadius: "0 0 0 4px" },
-                    { bottom: "20%", right: "15%", borderBottom: "3px solid #ff3b30", borderRight: "3px solid #ff3b30", borderRadius: "0 0 4px 0" },
+                    { top: "20%", left: "15%", borderTop: "3px solid #c65b45", borderLeft: "3px solid #c65b45", borderRadius: "4px 0 0 0" },
+                    { top: "20%", right: "15%", borderTop: "3px solid #c65b45", borderRight: "3px solid #c65b45", borderRadius: "0 4px 0 0" },
+                    { bottom: "20%", left: "15%", borderBottom: "3px solid #c65b45", borderLeft: "3px solid #c65b45", borderRadius: "0 0 0 4px" },
+                    { bottom: "20%", right: "15%", borderBottom: "3px solid #c65b45", borderRight: "3px solid #c65b45", borderRadius: "0 0 4px 0" },
                   ].map((s, i) => (
                     <div key={i} style={{ position: "absolute", width: "32px", height: "32px", ...s }} />
                   ))}
                   <div style={{
                     position: "absolute",
                     left: "15%", right: "15%", height: "2px",
-                    background: "linear-gradient(90deg, transparent, #ff3b30, transparent)",
+                    background: "linear-gradient(90deg, transparent, #c65b45, transparent)",
                     animation: "scanline 2s ease-in-out infinite",
                   }} />
                 </div>
@@ -330,21 +330,21 @@ export default function BarcodeScanner({ onResult, onClose }) {
               {phase === "found" && (
                 <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.78)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", zIndex: 3 }}>
                   <div style={{ fontSize: "3rem" }}>✅</div>
-                  <p style={{ color: "#fff", fontWeight: 800, textAlign: "center", padding: "0 24px", margin: 0 }}>{foundText}</p>
+                  <p style={{ color: "#f7f3ee", fontWeight: 800, textAlign: "center", padding: "0 24px", margin: 0 }}>{foundText}</p>
                 </div>
               )}
 
               {phase === "stopped" && (
                 <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px", zIndex: 3 }}>
-                  <p style={{ color: "#aaa", fontWeight: 700, margin: 0 }}>Camera paused</p>
-                  <button onClick={resumeCamera} style={{ padding: "12px 28px", borderRadius: "999px", background: "#fff", color: "#000", border: "none", fontWeight: 900, cursor: "pointer" }}>Resume</button>
+                  <p style={{ color: "rgba(247,243,238,0.58)", fontWeight: 700, margin: 0 }}>Camera paused</p>
+                  <button onClick={resumeCamera} style={{ padding: "12px 28px", borderRadius: "999px", background: "#f7f3ee", color: "#0c0b0a", border: "none", fontWeight: 900, cursor: "pointer" }}>Resume</button>
                 </div>
               )}
             </div>
 
             <div style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-              <p style={{ color: "#555", fontSize: "0.78rem", margin: 0, flex: 1 }}>
-                {phase === "scanning" ? "Point barcode at the red frame" : ""}
+              <p style={{ color: "rgba(247,243,238,0.32)", fontSize: "0.78rem", margin: 0, flex: 1 }}>
+                {phase === "scanning" ? "Point barcode at the frame" : ""}
               </p>
               <div style={{ display: "flex", gap: "8px" }}>
                 {phase === "scanning" && <button onClick={stopCamera} style={chipBtn}>⏸ Pause</button>}

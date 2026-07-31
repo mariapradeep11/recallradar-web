@@ -40,6 +40,8 @@ export default async function handler(req, res) {
     search_query: clean(body.search_query || body.query),
     source: clean(body.source, "waitlist"),
     intent: clean(body.intent),
+    watchlist_categories: clean(body.watchlist_categories),
+    alert_cadence: clean(body.alert_cadence),
     created_at: new Date().toISOString(),
     page: clean(body.page),
     user_agent: clean(req.headers["user-agent"]),

@@ -5,7 +5,7 @@ const categoryLabels = {
 };
 
 const categoryColors = {
-  food: "#ff9500", drug: "#30d158", device: "#0a84ff", consumer: "#bf5af2",
+  food: "#d9a441", drug: "#5c8a5c", device: "#8a7a9e", consumer: "#c65b45",
 };
 
 const formatTime = (iso) => {
@@ -26,8 +26,8 @@ const formatDate = (date = "") => {
 const getSeverityColor = (reason = "") => {
   const r = reason.toLowerCase();
   if (r.includes("listeria") || r.includes("salmonella") || r.includes("death") || r.includes("contamination")) return "#ff3b30";
-  if (r.includes("allergen") || r.includes("undeclared") || r.includes("metal")) return "#ff9500";
-  return "#888";
+  if (r.includes("allergen") || r.includes("undeclared") || r.includes("metal")) return "#d9a441";
+  return "#8f8880";
 };
 
 export default function HistoryPanel({
@@ -70,8 +70,8 @@ export default function HistoryPanel({
         position: "fixed",
         top: 0, right: 0, bottom: 0,
         width: "min(420px, 100vw)",
-        background: "#0a0a0a",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: "#0c0b0a",
+        border: "1px solid rgba(247,243,238,0.1)",
         borderRight: "none",
         zIndex: 91,
         display: "flex",
@@ -83,12 +83,12 @@ export default function HistoryPanel({
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
           padding: "20px 20px 16px",
-          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          borderBottom: "1px solid rgba(247,243,238,0.09)",
           flexShrink: 0,
         }}>
-          <strong style={{ fontSize: "1.1rem" }}>Your Activity</strong>
+          <strong style={{ fontSize: "1.1rem", color: "#f7f3ee" }}>Your Activity</strong>
           <button onClick={onClose} style={{
-            background: "rgba(255,255,255,0.07)", border: "none", color: "#fff",
+            background: "rgba(247,243,238,0.08)", border: "none", color: "#f7f3ee",
             borderRadius: "999px", width: "32px", height: "32px",
             cursor: "pointer", fontSize: "1rem",
           }}>✕</button>
@@ -97,7 +97,7 @@ export default function HistoryPanel({
         {/* Tabs */}
         <div style={{
           display: "flex", gap: "6px", padding: "12px 16px",
-          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          borderBottom: "1px solid rgba(247,243,238,0.09)",
           flexShrink: 0,
         }}>
           {tabs.map((t) => (
@@ -106,8 +106,8 @@ export default function HistoryPanel({
               onClick={() => setTab(t.id)}
               style={{
                 flex: 1, padding: "8px 4px", borderRadius: "10px", border: "none",
-                background: tab === t.id ? "rgba(255,255,255,0.1)" : "transparent",
-                color: tab === t.id ? "#fff" : "#666",
+                background: tab === t.id ? "rgba(247,243,238,0.1)" : "transparent",
+                color: tab === t.id ? "#f7f3ee" : "rgba(247,243,238,0.4)",
                 cursor: "pointer", fontWeight: tab === t.id ? 800 : 500,
                 fontSize: "0.78rem", transition: "all 0.15s",
                 display: "flex", flexDirection: "column", alignItems: "center", gap: "2px",
@@ -116,9 +116,9 @@ export default function HistoryPanel({
               <span>{t.label}</span>
               {t.count > 0 && (
                 <span style={{
-                  background: tab === t.id ? "#ff3b30" : "rgba(255,255,255,0.12)",
+                  background: tab === t.id ? "#c65b45" : "rgba(247,243,238,0.14)",
                   borderRadius: "999px", padding: "1px 6px",
-                  fontSize: "0.68rem", fontWeight: 900, color: "#fff",
+                  fontSize: "0.68rem", fontWeight: 900, color: "#fbf1ec",
                 }}>
                   {t.count}
                 </span>
@@ -215,8 +215,8 @@ function EmptyState({ icon, title, body }) {
   return (
     <div style={{ textAlign: "center", padding: "48px 20px" }}>
       <div style={{ fontSize: "2.5rem", marginBottom: "12px" }}>{icon}</div>
-      <p style={{ color: "#ccc", fontWeight: 700, margin: "0 0 8px" }}>{title}</p>
-      <p style={{ color: "#555", fontSize: "0.85rem", lineHeight: 1.6 }}>{body}</p>
+      <p style={{ color: "rgba(247,243,238,0.7)", fontWeight: 700, margin: "0 0 8px" }}>{title}</p>
+      <p style={{ color: "rgba(247,243,238,0.32)", fontSize: "0.85rem", lineHeight: 1.6 }}>{body}</p>
     </div>
   );
 }
@@ -226,23 +226,23 @@ function SearchCard({ item, saved, onRun, onToggle, showCount }) {
     <div style={{
       display: "flex", alignItems: "center", gap: "12px",
       padding: "12px 14px", borderRadius: "14px", marginBottom: "8px",
-      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+      background: "rgba(247,243,238,0.035)", border: "1px solid rgba(247,243,238,0.07)",
     }}>
       {/* Category dot */}
       <div style={{
         width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
-        background: categoryColors[item.category] || "#888",
+        background: categoryColors[item.category] || "#8f8880",
       }} />
 
       {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontWeight: 700, fontSize: "0.92rem", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <p style={{ margin: 0, fontWeight: 700, fontSize: "0.92rem", color: "#f7f3ee", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {item.query}
         </p>
-        <p style={{ margin: "2px 0 0", fontSize: "0.74rem", color: "#555" }}>
+        <p style={{ margin: "2px 0 0", fontSize: "0.74rem", color: "rgba(247,243,238,0.32)" }}>
           {categoryLabels[item.category]}
           {showCount && item.resultCount !== undefined && (
-            <span style={{ marginLeft: "6px", color: item.resultCount > 0 ? "#ff9500" : "#444" }}>
+            <span style={{ marginLeft: "6px", color: item.resultCount > 0 ? "#d9a441" : "rgba(247,243,238,0.24)" }}>
               · {item.resultCount} result{item.resultCount !== 1 ? "s" : ""}
             </span>
           )}
@@ -266,8 +266,8 @@ function SearchCard({ item, saved, onRun, onToggle, showCount }) {
         <button
           onClick={onRun}
           style={{
-            background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)",
-            color: "#ccc", borderRadius: "8px", padding: "5px 10px",
+            background: "rgba(247,243,238,0.06)", border: "1px solid rgba(247,243,238,0.09)",
+            color: "rgba(247,243,238,0.75)", borderRadius: "8px", padding: "5px 10px",
             cursor: "pointer", fontSize: "0.75rem", fontWeight: 700,
           }}
         >
@@ -283,11 +283,11 @@ function AlertCard({ item }) {
   return (
     <div style={{
       padding: "12px 14px", borderRadius: "14px", marginBottom: "8px",
-      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+      background: "rgba(247,243,238,0.035)", border: "1px solid rgba(247,243,238,0.07)",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
         <p style={{
-          margin: 0, fontWeight: 700, fontSize: "0.88rem", color: "#fff",
+          margin: 0, fontWeight: 700, fontSize: "0.88rem", color: "#f7f3ee",
           lineHeight: 1.4, flex: 1,
         }}>
           {item.product.length > 80 ? item.product.slice(0, 80) + "…" : item.product}
@@ -297,8 +297,8 @@ function AlertCard({ item }) {
           background: color, marginTop: "5px",
         }} />
       </div>
-      <p style={{ margin: "6px 0 0", fontSize: "0.75rem", color: "#555", lineHeight: 1.4 }}>
-        {item.firm && <span style={{ color: "#666" }}>{item.firm} · </span>}
+      <p style={{ margin: "6px 0 0", fontSize: "0.75rem", color: "rgba(247,243,238,0.32)", lineHeight: 1.4 }}>
+        {item.firm && <span style={{ color: "rgba(247,243,238,0.4)" }}>{item.firm} · </span>}
         {formatDate(item.report_date)}
         <span style={{ marginLeft: "6px" }}>· {formatTime(item.timestamp)}</span>
       </p>
@@ -313,8 +313,8 @@ function ClearButton({ label, onClick }) {
       style={{
         width: "100%", marginTop: "16px", padding: "11px",
         borderRadius: "12px", background: "transparent",
-        border: "1px solid rgba(255,255,255,0.07)",
-        color: "#444", cursor: "pointer", fontSize: "0.82rem",
+        border: "1px solid rgba(247,243,238,0.09)",
+        color: "rgba(247,243,238,0.28)", cursor: "pointer", fontSize: "0.82rem",
       }}
     >
       {label}

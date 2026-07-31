@@ -9,16 +9,16 @@ const riskColors = {
     glow: "rgba(255,59,48,0.12)",
   },
   MEDIUM: {
-    bg: "rgba(255,149,0,0.15)",
-    color: "#ffb14a",
-    border: "rgba(255,149,0,0.28)",
-    glow: "rgba(255,149,0,0.08)",
+    bg: "rgba(217,164,65,0.16)",
+    color: "#e8c179",
+    border: "rgba(217,164,65,0.3)",
+    glow: "rgba(217,164,65,0.08)",
   },
   LOW: {
-    bg: "rgba(255,255,255,0.06)",
-    color: "#aaa",
-    border: "rgba(255,255,255,0.12)",
-    glow: "rgba(255,255,255,0.03)",
+    bg: "rgba(247,243,238,0.06)",
+    color: "rgba(247,243,238,0.6)",
+    border: "rgba(247,243,238,0.13)",
+    glow: "rgba(247,243,238,0.03)",
   },
 };
 
@@ -76,9 +76,9 @@ export default function RiskIntelligence({
           marginTop: "14px",
           padding: "14px 16px",
           borderRadius: "18px",
-          background: "rgba(255,255,255,0.045)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          color: "#aaa",
+          background: "rgba(247,243,238,0.045)",
+          border: "1px solid rgba(247,243,238,0.08)",
+          color: "rgba(247,243,238,0.6)",
           fontWeight: 800,
         }}
       >
@@ -97,7 +97,7 @@ export default function RiskIntelligence({
       style={{
         marginTop: "16px",
         border: `1px solid ${theme.border}`,
-        background: "rgba(14,14,16,0.92)",
+        background: "rgba(12,11,10,0.92)",
         borderRadius: "22px",
         overflow: "hidden",
         boxShadow: `0 24px 80px ${theme.glow}`,
@@ -110,7 +110,7 @@ export default function RiskIntelligence({
           width: "100%",
           border: "none",
           background: "transparent",
-          color: "#fff",
+          color: "#f7f3ee",
           padding: "18px 18px 14px",
           cursor: "pointer",
           display: "flex",
@@ -145,7 +145,7 @@ export default function RiskIntelligence({
 
           <div
             style={{
-              color: "#8a8a8f",
+              color: "rgba(247,243,238,0.45)",
               fontSize: "0.82rem",
               marginTop: "4px",
               lineHeight: 1.45,
@@ -157,7 +157,7 @@ export default function RiskIntelligence({
           {risk.riskQualifier && (
             <div
               style={{
-                color: "#b8b8be",
+                color: "rgba(247,243,238,0.55)",
                 fontSize: "0.82rem",
                 marginTop: "6px",
                 lineHeight: 1.45,
@@ -175,7 +175,7 @@ export default function RiskIntelligence({
                 flexWrap: "wrap",
                 marginTop: "10px",
                 fontSize: "0.78rem",
-                color: "#9a9aa1",
+                color: "rgba(247,243,238,0.5)",
               }}
             >
               {source && <span>✔ Verified source: {source}</span>}
@@ -184,7 +184,7 @@ export default function RiskIntelligence({
           )}
         </div>
 
-        <span style={{ color: "#aaa", fontSize: "1.1rem" }}>
+        <span style={{ color: "rgba(247,243,238,0.55)", fontSize: "1.1rem" }}>
           {open ? "−" : "+"}
         </span>
       </button>
@@ -222,9 +222,9 @@ export default function RiskIntelligence({
                       style={{
                         padding: "10px 14px",
                         borderRadius: "999px",
-                        background: "rgba(255,255,255,0.055)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        color: "#e5e5e5",
+                        background: "rgba(247,243,238,0.055)",
+                        border: "1px solid rgba(247,243,238,0.08)",
+                        color: "rgba(247,243,238,0.88)",
                         fontSize: "0.9rem",
                         fontWeight: 700,
                       }}
@@ -246,13 +246,13 @@ export default function RiskIntelligence({
                   style={{
                     padding: "14px",
                     borderRadius: "16px",
-                    background: "rgba(255,255,255,0.045)",
-                    border: "1px solid rgba(255,255,255,0.06)",
+                    background: "rgba(247,243,238,0.045)",
+                    border: "1px solid rgba(247,243,238,0.06)",
                   }}
                 >
                   <div
                     style={{
-                      color: "#888",
+                      color: "rgba(247,243,238,0.4)",
                       fontSize: "0.76rem",
                       fontWeight: 900,
                       marginBottom: "7px",
@@ -261,7 +261,7 @@ export default function RiskIntelligence({
                     REPORTED IMPACT
                   </div>
 
-                  <div style={{ color: "#fff", lineHeight: 1.5 }}>
+                  <div style={{ color: "#f7f3ee", lineHeight: 1.5 }}>
                     {risk.reportedImpact ||
                       "No reported impact count found in available recall details."}
                   </div>
@@ -271,13 +271,13 @@ export default function RiskIntelligence({
                   style={{
                     padding: "14px",
                     borderRadius: "16px",
-                    background: "rgba(255,255,255,0.045)",
-                    border: "1px solid rgba(255,255,255,0.06)",
+                    background: "rgba(247,243,238,0.045)",
+                    border: "1px solid rgba(247,243,238,0.06)",
                   }}
                 >
                   <div
                     style={{
-                      color: "#888",
+                      color: "rgba(247,243,238,0.4)",
                       fontSize: "0.76rem",
                       fontWeight: 900,
                       marginBottom: "7px",
@@ -286,14 +286,14 @@ export default function RiskIntelligence({
                     CONFIDENCE
                   </div>
 
-                  <div style={{ color: "#fff", lineHeight: 1.5 }}>
+                  <div style={{ color: "#f7f3ee", lineHeight: 1.5 }}>
                     {risk.confidence || "Medium"} confidence
                   </div>
 
                   <div
                     style={{
                       marginTop: "8px",
-                      color: "#888",
+                      color: "rgba(247,243,238,0.4)",
                       fontSize: "0.78rem",
                       lineHeight: 1.45,
                     }}
@@ -329,8 +329,8 @@ export default function RiskIntelligence({
                         padding: "11px 12px",
                         borderRadius: "13px",
                         background: "rgba(0,0,0,0.2)",
-                        border: "1px solid rgba(255,255,255,0.05)",
-                        color: "#f1f1f1",
+                        border: "1px solid rgba(247,243,238,0.05)",
+                        color: "rgba(247,243,238,0.92)",
                         lineHeight: 1.45,
                       }}
                     >
@@ -348,17 +348,17 @@ export default function RiskIntelligence({
                   style={{
                     padding: "15px",
                     borderRadius: "16px",
-                    background: "rgba(255,255,255,0.035)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    color: "#c9c9cf",
+                    background: "rgba(247,243,238,0.035)",
+                    border: "1px solid rgba(247,243,238,0.06)",
+                    color: "rgba(247,243,238,0.78)",
                     lineHeight: 1.55,
                   }}
                 >
-                  <strong style={{ color: "#fff" }}>
+                  <strong style={{ color: "#f7f3ee" }}>
                     What RecallRadar checked
                   </strong>
 
-                  <div style={{ marginTop: "10px", color: "#aaa" }}>
+                  <div style={{ marginTop: "10px", color: "rgba(247,243,238,0.55)" }}>
                     {sourceContext.sourceName && (
                       <div>✔ Source: {sourceContext.sourceName}</div>
                     )}
@@ -382,10 +382,10 @@ export default function RiskIntelligence({
                           style={{
                             padding: "7px 10px",
                             borderRadius: "999px",
-                            background: "rgba(255,255,255,0.055)",
-                            border: "1px solid rgba(255,255,255,0.08)",
+                            background: "rgba(247,243,238,0.055)",
+                            border: "1px solid rgba(247,243,238,0.08)",
                             fontSize: "0.78rem",
-                            color: "#ddd",
+                            color: "rgba(247,243,238,0.85)",
                           }}
                         >
                           {field}
@@ -397,7 +397,7 @@ export default function RiskIntelligence({
                   {sourceContext.note && (
                     <p
                       style={{
-                        color: "#888",
+                        color: "rgba(247,243,238,0.4)",
                         margin: "12px 0 0",
                         fontSize: "0.85rem",
                       }}
@@ -409,7 +409,7 @@ export default function RiskIntelligence({
                   {Array.isArray(sourceContext.trustedSources) &&
                     sourceContext.trustedSources.length > 0 && (
                       <div style={{ marginTop: "14px" }}>
-                        <strong style={{ color: "#fff", fontSize: "0.9rem" }}>
+                        <strong style={{ color: "#f7f3ee", fontSize: "0.9rem" }}>
                           Trusted source links
                         </strong>
 
@@ -427,7 +427,7 @@ export default function RiskIntelligence({
                               target="_blank"
                               rel="noreferrer"
                               style={{
-                                color: "#ffb4ae",
+                                color: "#e4a396",
                                 textDecoration: "none",
                                 fontWeight: 800,
                                 fontSize: "0.88rem",
@@ -447,13 +447,13 @@ export default function RiskIntelligence({
                   style={{
                     padding: "14px",
                     borderRadius: "16px",
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.05)",
+                    background: "rgba(247,243,238,0.03)",
+                    border: "1px solid rgba(247,243,238,0.05)",
                   }}
                 >
                   <div
                     style={{
-                      color: "#888",
+                      color: "rgba(247,243,238,0.4)",
                       fontSize: "0.76rem",
                       fontWeight: 900,
                       marginBottom: "8px",
@@ -464,7 +464,7 @@ export default function RiskIntelligence({
 
                   <p
                     style={{
-                      color: "#bbb",
+                      color: "rgba(247,243,238,0.6)",
                       lineHeight: 1.65,
                       margin: 0,
                     }}
