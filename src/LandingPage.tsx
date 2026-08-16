@@ -211,16 +211,15 @@ export default function LandingPage({
     setWatchError("");
     setSubmitting(true);
     try {
-      const res = await fetch("/api/waitlist", {
+      const res = await fetch("https://api.sheetbest.com/sheets/a5c4ecd4-7684-48f7-9cd0-8ccf090c0b7a", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim(),
           source: "landing_watchlist",
-          intent: "monitor",
-          page: "landing",
-          watchlist_categories: selectedCats.length ? selectedCats.join(", ") : "All categories",
-          alert_cadence: cadence,
+          category: selectedCats.length ? selectedCats.join(", ") : "All categories",
+          search_query: cadence,
+          timestamp: new Date().toISOString(),
         }),
       });
       if (!res.ok) throw new Error("Watchlist request failed");

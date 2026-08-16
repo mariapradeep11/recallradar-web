@@ -359,7 +359,7 @@ export default function App() {
       <Suspense fallback={<div style={{ minHeight: "100vh", background: "#0c0b0a", color: "#f7f3ee" }} />}>
         <LandingPage
           onLaunch={launchFromLanding}
-          onCategory={(cat) => launchFromLanding({ category: cat as Category })}
+          onCategory={(cat) => launchFromLanding({ category: (cat === "vehicle" ? "consumer" : cat) as Category })}
         />
       </Suspense>
     );
